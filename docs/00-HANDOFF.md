@@ -7,6 +7,7 @@
 
 使用者要求同一台電腦啟動單機試用。對應 D015、T031。
 RTX 2070 SUPER（8 GiB）已通過 CUDA 驅動與 Demucs 六軌合成音推論，見 [ENV-002](evidence/ENV-002.md)。
+新工作採 6 秒分段、25% 重疊、3 次時移，見 [LOCAL-MODEL-002](evidence/LOCAL-MODEL-002.md)。
 網站協調器已實作，模型驗證可獨立進行。
 原始需求仍為個人網站、YouTube 音訊取得、去人聲／去吉他、儲存、多筆依序執行與可持續接手文件。
 

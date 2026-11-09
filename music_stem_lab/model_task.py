@@ -9,11 +9,15 @@ from .domain import EXPORT_SOURCES
 
 STEMS = ("drums", "bass", "other", "vocals", "guitar", "piano")
 SAMPLE_RATE = 44100
+SEGMENT_SECONDS = 6
+OVERLAP = 0.25
+SHIFTS = 3
 WEIGHTS_SHA256 = "34c22ccb381c6f9fdbf324f04e1e2fe21aaaf293f5ded163a162697ff9a02ddd"
 PROFILE = {
     "profile_id": "demucs-htdemucs-6s-cuda",
     "version": "demucs-4.0.1",
-    "description": "Demucs 六軌 CUDA，4 秒分段、25% 重疊、shifts=0；伴奏由其餘音軌相加。",
+    "description": (f"Demucs 六軌 CUDA，{SEGMENT_SECONDS} 秒分段、{OVERLAP:.0%} 重疊、"
+                    f"shifts={SHIFTS}；伴奏由其餘音軌相加。"),
     "weights_sha256": WEIGHTS_SHA256,
 }
 
@@ -47,7 +51,7 @@ def separate(model, source, target, kinds, rate, frames, channels):
     if actual_rate != SAMPLE_RATE or mix.shape[1] != 2:
         raise ValueError("模型輸入需為 44.1 kHz 雙聲道。")
     stems = apply_model(model, torch.from_numpy(mix.T)[None], device="cuda",
-                        segment=4, overlap=.25, shifts=0)[0]
+                        segment=SEGMENT_SECONDS, overlap=OVERLAP, shifts=SHIFTS)[0]
     # A WAV source keeps its original format. Align every derived WAV with it.
     def format_track(track):
         if channels == 1:
