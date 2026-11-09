@@ -183,3 +183,9 @@ Windows 啟動檔實測可啟動 GPU 服務、呼叫預設瀏覽器並重用已�
 
 新增 `Stop Music Stem Lab.cmd`，以本機啟動器產生的憑證向服務請求正常關閉。執行中或發布中的工作會阻擋關閉，排隊工作留待下次啟動。
 pytest 64 項通過，含缺憑證、跨來源、佇列保留與執行中拒絕關閉。以隔離資料實際執行 Windows 開啟與關閉檔，確認 8000 埠關閉及重複執行安全。
+
+## W021：2026-11-09，T036 本機服務跟隨 CMD 視窗
+
+啟動器保留前景視窗，以 Windows Job Object 把服務和它的子程序綁到該次啟動。關閉 CMD 視窗後連帶停止。Stop 檔仍可正常關閉。直接關視窗會中斷執行中的工作。
+在獨立 CMD、8018 埠與隔離資料實測關視窗，確認服務與一個不附著於命令視窗的模擬子程序均退出。另驗證 Stop 檔可正常退出啟動視窗。實測程序名稱為 cmd.exe 與 python.exe。pytest 64 項通過。
+[Windows Job Object 子程序與關閉行為](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects)

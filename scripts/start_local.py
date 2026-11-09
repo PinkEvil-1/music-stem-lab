@@ -10,6 +10,8 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import ProxyHandler, Request, build_opener
 
+from music_stem_lab.windows_job import service_job
+
 ROOT = Path(__file__).resolve().parents[1]
 URL = "http://127.0.0.1:8000/"
 OPENER = build_opener(ProxyHandler({}))
@@ -83,7 +85,7 @@ def ready():
     return True
 
 
-def start():
+def start(job_name):
     config_path = ROOT / ".env.local.json"
     config = json.loads(config_path.read_text(encoding="utf-8-sig")) if config_path.exists() else {}
     python = ROOT / config.get("python", ".venv/Scripts/python.exe")
@@ -94,18 +96,18 @@ def start():
     log_path = ROOT / ".tmp" / "local-launch.log"
     log_path.parent.mkdir(exist_ok=True)
     environment = {**os.environ, "MUSIC_STEM_WORKER_TOKEN": "",
-                   "MUSIC_STEM_LOCAL_SHUTDOWN_TOKEN": shutdown_token(create=True)}
+                   "MUSIC_STEM_LOCAL_SHUTDOWN_TOKEN": shutdown_token(create=True),
+                   "MUSIC_STEM_WINDOWS_JOB": job_name}
     with log_path.open("ab") as log:
         process = subprocess.Popen(
             [str(python), "-m", "music_stem_lab", "--enable-download", "--enable-local-folder",
              "--model-checkpoint", str(checkpoint)],
             cwd=ROOT, env=environment, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
-            creationflags=subprocess.CREATE_NO_WINDOW,
         )
     deadline = time.monotonic() + 75
     while time.monotonic() < deadline:
         if ready():
-            return
+            return process
         if process.poll() is not None:
             break
         time.sleep(.5)
@@ -121,11 +123,25 @@ def main():
         if args.stop:
             stop()
             return 0
-        if not ready():
-            start()
-        if not args.no_browser:
-            os.startfile(URL)
-        print(URL)
+        if ready():
+            if not args.no_browser:
+                os.startfile(URL)
+            print(f"Music Stem Lab is already running at {URL}")
+            return 0
+        print("Starting Music Stem Lab...", flush=True)
+        with service_job() as job_name:
+            process = start(job_name)
+            print(URL, flush=True)
+            print("Keep this window open. Close it to stop Music Stem Lab.", flush=True)
+            if not args.no_browser:
+                os.startfile(URL)
+            try:
+                return process.wait()
+            except KeyboardInterrupt:
+                try:
+                    return process.wait(timeout=12)
+                except subprocess.TimeoutExpired:
+                    return 0
     except (OSError, RuntimeError, ValueError, TypeError, subprocess.SubprocessError) as error:
         print(f"Music Stem Lab: {error}", file=sys.stderr)
         return 1

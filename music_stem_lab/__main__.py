@@ -18,6 +18,10 @@ def main():
                         help="Allow the local UI to open completed job folders in Windows Explorer")
     args = parser.parse_args()
     shutdown_token = os.environ.pop("MUSIC_STEM_LOCAL_SHUTDOWN_TOKEN", "")
+    job_name = os.environ.pop("MUSIC_STEM_WINDOWS_JOB", "")
+    if job_name:
+        from .windows_job import join_service_job
+        join_service_job(job_name)
     checkpoint = args.model_checkpoint.resolve() if args.model_checkpoint else None
     if checkpoint:
         try:
