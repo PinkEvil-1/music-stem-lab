@@ -24,6 +24,7 @@ RTX 2070 SUPER（8 GiB）已通過 CUDA 驅動與 Demucs 六軌合成音推論�
 - 受 token 驗證的遠端工作領取、心跳、檔案上傳及完成 API。
 - 音檔格式／WAV 規格、雜湊與必要產物驗證，manifest、原子發布、重啟對帳。
 - 試聽／Range 下載、配額、刪除 tombstone 與離線備份還原。
+- 新的本機下載與分軌產物採「類型 - 影片名稱」（T032）。
 - 明確標示的合成音示範；不下載或分離歌曲。
 - 需顯式啟用的原始音訊下載 adapter，不使用個人 cookie。
 - 網站與測試依賴曾於舊主機的 .venv 驗證，版本記錄在 requirements.lock。

@@ -44,7 +44,12 @@ def download(url, target, max_bytes, max_seconds):
             return 2
         ydl.download([url])
     candidates = [p for p in target.iterdir() if p.name.startswith("source.") and p.suffix not in (".part", ".ytdl")]
-    return 0 if len(candidates) == 1 and 0 < candidates[0].stat().st_size <= max_bytes else 2
+    if len(candidates) != 1 or not 0 < candidates[0].stat().st_size <= max_bytes:
+        return 2
+    title = info.get("title")
+    if isinstance(title, str) and title.strip():
+        (target / "title.txt").write_text(title[:300], encoding="utf-8")
+    return 0
 
 def main():
     parser = argparse.ArgumentParser()

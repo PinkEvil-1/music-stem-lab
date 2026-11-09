@@ -2,15 +2,38 @@ import hashlib
 import json
 import mimetypes
 import os
+import re
 from pathlib import Path
 import shutil
 import stat
 import threading
+import unicodedata
 import wave
 
 from .domain import MODES, Problem, required_artifacts
 from .store import Store, timestamp, uid
 from .decode import validate_decode
+
+TRACK_LABELS = {
+    "source": "來源音訊", "vocals": "人聲", "drums": "鼓", "bass": "貝斯",
+    "guitar": "吉他", "piano": "鋼琴", "other": "其他音源",
+    "no_vocals": "去人聲", "no_guitar": "去吉他",
+}
+
+
+def track_filename(directory, kind, extension, title, video_id):
+    cleaned = unicodedata.normalize("NFC", title)
+    cleaned = "".join(" " if unicodedata.category(c) in ("Cc", "Cf", "Cs") else c for c in cleaned)
+    cleaned = " ".join(re.sub(r'[<>:"/\\|?*]', " ", cleaned).split()).strip(" .")
+    prefix = TRACK_LABELS.get(kind, kind) + " - "
+    # Leave room for the attempt directory's work-to-published rename on Windows.
+    published = directory.with_name("published")
+    fixed = len(str(published / (prefix + extension)).encode("utf-16-le")) // 2
+    budget = min(70, max(len(video_id), 245 - fixed))
+    title_units = (cleaned or video_id).encode("utf-16-le")[:budget * 2]
+    safe_title = title_units.decode("utf-16-le", errors="ignore").rstrip(" .") or video_id
+    return prefix + safe_title + extension
+
 
 class Artifacts:
     def __init__(self, store: Store):
@@ -53,7 +76,7 @@ class Artifacts:
     def directory(self, job):
         return self.safe(self.root / "jobs" / job["id"] / "attempts" / job["attempt_id"])
 
-    def new_upload(self, job_id, token, kind, extension):
+    def new_upload(self, job_id, token, kind, extension, *, title=None):
         if extension not in (".wav", ".webm", ".m4a", ".mp3", ".opus", ".ogg", ".flac"):
             raise Problem("INVALID_FORMAT", "不支援此音訊格式。", 422)
         with self.store.transaction() as c:
@@ -65,7 +88,13 @@ class Artifacts:
             self.capacity()
             directory = self.directory(job) / "work"
             self.safe(directory).mkdir(parents=True, exist_ok=True)
-            return self.safe(directory / (kind + "-" + uid() + extension))
+            if title is None:
+                return self.safe(directory / (kind + "-" + uid() + extension))
+            filename = track_filename(directory, kind, extension, title, job["video_id"])
+            path = self.safe(directory / filename)
+            if path.exists():
+                raise Problem("STATE_CONFLICT", "此輸出檔案已存在。")
+            return path
 
     @staticmethod
     def digest(path):
@@ -244,7 +273,9 @@ class Artifacts:
         path = self.safe(self.root / row["path"])
         if not path.is_file() or path.stat().st_size != row["size"] or self.digest(path) != row["sha256"]:
             raise Problem("ARTIFACT_UNAVAILABLE", "檔案已遺失或損毀。", 410)
-        return path, row["media_type"], row["kind"] + path.suffix
+        legacy = re.fullmatch(re.escape(row["kind"]) + r"-[0-9a-f]{32}" + re.escape(path.suffix), path.name)
+        filename = row["kind"] + path.suffix if legacy else path.name
+        return path, row["media_type"], filename
 
     def delete(self, job_id):
         with self.store.transaction() as c:

@@ -161,3 +161,8 @@ Demucs htdemucs_6s 在 RTX 2070 SUPER 完成 30 秒及 180 秒合成音推論，
 
 依 D015 增加 T031。啟動時檢查固定六軌權重與 CUDA，既有本機 worker 可領取真實分軌工作、下載解碼、執行 Demucs 並發布原生軌和所選伴奏。
 60 項 pytest、10 項既有 Edge smoke、兩筆合成 WebM 來源的真實 CUDA 整合通過。正式音質與 YouTube 到分軌的實際歌曲驗收待續。見 LOCAL-MODEL-001。
+
+## W017：2026-11-09，T032 本機產物命名
+
+使用 yt-dlp 已取得的影片標題，發布與下載採「類型 - 影片名稱」。過濾 Windows 不支援的字元並限制檔名長度，缺標題時用影片 ID。舊工作仍可下載。
+本機分軌測試核對 manifest 檔名與 Range 下載的 Content-Disposition，下載器替身驗證標題交接。pytest 60 項通過。

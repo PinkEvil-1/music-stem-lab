@@ -140,7 +140,9 @@ class LocalWorker:
         with TemporaryDirectory(prefix="local-", dir=attempt) as temporary:
             target = Path(temporary)
             downloaded = self.download(job, target)
-            source = self.files.new_upload(job["id"], token, "source", downloaded.suffix)
+            title_file = target / "title.txt"
+            title = title_file.read_text(encoding="utf-8") if title_file.is_file() else job["video_id"]
+            source = self.files.new_upload(job["id"], token, "source", downloaded.suffix, title=title)
             shutil.move(downloaded, source)
             source_info = self.files.register_upload(
                 job["id"], token, "source", source,
@@ -149,7 +151,7 @@ class LocalWorker:
             profile = {"profile_id": "source-download", "version": "1",
                        "description": "保存原始來源格式"}
             if job["mode"] != "download_audio":
-                self.separate(job, source, source_info["metadata"], target)
+                self.separate(job, source, source_info["metadata"], target, title)
                 profile = PROFILE
             self.checkpoint(job, "verifying")
         self.files.publish(job["id"], token, profile)
@@ -161,7 +163,7 @@ class LocalWorker:
                    "--max-seconds", str(self.settings.max_duration_seconds)]
 
         def check_size():
-            if sum(p.stat().st_size for p in target.iterdir() if p.is_file()) > self.settings.max_upload_bytes:
+            if sum(p.stat().st_size for p in target.iterdir() if p.name.startswith("source.") and p.is_file()) > self.settings.max_upload_bytes:
                 raise Problem("SOURCE_LIMIT", "來源超出限制。")
 
         self.run_process(job, command, "fetching", self.settings.download_timeout_seconds,
@@ -173,7 +175,7 @@ class LocalWorker:
         self.checkpoint(job, "decoding")
         return candidates[0]
 
-    def separate(self, job, source, metadata, target):
+    def separate(self, job, source, metadata, target, title):
         duration = self.settings.max_duration_seconds
         pcm = target / "input.wav"
         self.files.capacity((duration + 1) * SAMPLE_RATE * 4 + 4096)
@@ -198,6 +200,6 @@ class LocalWorker:
         token = job["attempt_token"]
         for kind in kinds:
             self.checkpoint(job, "verifying")
-            path = self.files.new_upload(job["id"], token, kind, ".wav")
+            path = self.files.new_upload(job["id"], token, kind, ".wav", title=title)
             shutil.move(target / (kind + ".wav"), path)
             self.files.register_upload(job["id"], token, kind, path)

@@ -1,5 +1,6 @@
 """Exercise the local queue with an actual WAV source and a stand-in model."""
 from pathlib import Path
+from urllib.parse import unquote
 import time
 import wave
 
@@ -15,6 +16,7 @@ def test_real_job_uses_local_model_and_publishes_requested_wavs(tmp_path, monkey
     def fixture_source(self, job, target):
         source = target / "source.wav"
         source.write_bytes(demo_audio())
+        (target / "title.txt").write_text('測試歌曲 / Live? 2026.', encoding="utf-8")
         return source
 
     run_process = LocalWorker.run_process
@@ -50,5 +52,10 @@ def test_real_job_uses_local_model_and_publishes_requested_wavs(tmp_path, monkey
         assert job["state"] == "completed", job
         urls = {artifact["kind"]: artifact["url"] for artifact in job["artifacts"]}
         assert set(urls) == {"source", *STEMS, "no_guitar", "no_vocals", "manifest"}
-        assert client.get(urls["manifest"]).json()["profile"] == PROFILE
-        assert client.get(urls["guitar"], headers={"Range": "bytes=0-15"}).status_code == 206
+        manifest = client.get(urls["manifest"]).json()
+        assert manifest["profile"] == PROFILE
+        guitar = next(item for item in manifest["artifacts"] if item["kind"] == "guitar")
+        assert guitar["filename"] == "吉他 - 測試歌曲 Live 2026.wav"
+        response = client.get(urls["guitar"] + "?download=true", headers={"Range": "bytes=0-15"})
+        assert response.status_code == 206
+        assert unquote(response.headers["content-disposition"]).endswith(guitar["filename"])

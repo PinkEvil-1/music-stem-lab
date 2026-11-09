@@ -304,11 +304,12 @@ def test_download_adapter_without_live_source(tmp_path, monkeypatch):
         def __enter__(self): return self
         def __exit__(self, *args): pass
         def extract_info(self, url, download=False):
-            return {"duration": 1, "is_live": False}
+            return {"duration": 1, "is_live": False, "title": "測試歌曲"}
         def download(self, urls):
             (tmp_path / "source.wav").write_bytes(demo_audio())
     monkeypatch.setattr("yt_dlp.YoutubeDL", FakeYoutubeDL)
     assert download(URLS[0], tmp_path, 1000000, 1200) == 0
+    assert (tmp_path / "title.txt").read_text(encoding="utf-8") == "測試歌曲"
 
 def test_service_lock_prevents_second_coordinator(tmp_path):
     from music_stem_lab.maintenance import ServiceLock
