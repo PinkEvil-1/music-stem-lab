@@ -31,6 +31,13 @@ Windows 已備妥環境時，雙擊根目錄的 `Start Music Stem Lab.cmd`。它
 
 預設讀取 `.venv/Scripts/python.exe` 與 `models/5c90dfd2-34c22ccb.th`。若使用其他位置，可在專案根目錄建立 `.env.local.json`，設定 `python` 和 `checkpoint` 兩個路徑字串。相對路徑從專案根目錄解析。啟動日誌在 `.tmp/local-launch.log`。
 
+若已備妥 `models/wheels/environment.lock` 和其中列出的 wheel，可用相同版本與架構的 Python 離線重建環境。此電腦的備份對應 Windows x64、Python 3.13 與 CUDA 版 PyTorch。
+
+~~~powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --no-index --find-links models/wheels -r models/wheels/environment.lock
+~~~
+
 已完成的工作會顯示「開啟結果資料夾」，直接在 Windows 檔案總管開啟該筆產物所在資料夾。手動啟動時可加 `--enable-local-folder` 啟用。
 
 目前已在 Windows、Python 3.13.17 驗證網站部分。以下命令都在專案根目錄執行。
