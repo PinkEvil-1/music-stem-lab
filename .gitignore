@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+data/
+models/
+.env
+.env.*
+!.env.example
+*.log
+.tmp/
+
+backups/
+restored-data/
