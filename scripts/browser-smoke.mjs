@@ -50,7 +50,7 @@ class CDP {
     });
   }
   async evaluate(expression) {
-    const value = await this.call("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
+    const value = await this.call("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true, userGesture: true });
     if (value.exceptionDetails) throw new Error("Browser evaluation failed");
     return value.result.value;
   }
@@ -76,12 +76,29 @@ try {
   await cdp.call("Page.enable");
   await cdp.call("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
   await until(() => cdp.evaluate("document.querySelector('#service-note').textContent.includes('工作室已就緒')"));
-  await cdp.evaluate("document.querySelector('#example').click(); document.querySelector('input[value=remove_guitar]').click(); document.querySelector('#submit').click(); true");
+  assert.equal(await cdp.evaluate("document.querySelector('#extra-exports').disabled"), true);
+  await cdp.evaluate("document.querySelector('#example').click(); true");
+  assert.equal(await cdp.evaluate("document.querySelector('#export-no-vocals').checked || document.querySelector('#export-no-guitar').checked"), false);
+  await cdp.evaluate("document.querySelector('#export-no-vocals').click(); true");
+  assert.equal(await cdp.evaluate("document.querySelector('#export-no-guitar').checked"), false);
+  await cdp.evaluate("document.querySelector('#export-no-guitar').click(); document.querySelector('input[value=download_audio]').click(); true");
+  assert.equal(await cdp.evaluate("document.querySelector('#extra-exports').disabled"), true);
+  await cdp.evaluate("document.querySelector('input[value=separate]').click(); document.querySelector('#submit').click(); true");
   await until(() => cdp.evaluate("document.querySelector('#count-completed').textContent === '2'"), 25000);
   assert.equal(await cdp.evaluate("document.querySelectorAll('.job').length"), 2);
   await cdp.evaluate("document.querySelector('.job-actions button').click(); true");
   await until(() => cdp.evaluate("document.querySelector('#job-dialog').open"));
-  assert.equal(await cdp.evaluate("document.querySelectorAll('#job-detail audio').length"), 3);
+  assert.equal(await cdp.evaluate("document.querySelectorAll('#job-detail audio').length"), 9);
+  const jobs = await (await fetch(base + "/api/jobs")).json();
+  for (const job of jobs.items) {
+    assert.deepEqual(job.extra_exports, ["no_guitar", "no_vocals"]);
+    assert.equal(job.native_stems.length, 6);
+    assert.equal(job.artifacts.length, 10);
+  }
+  const playback = await cdp.evaluate("(async () => { const audio = document.querySelector('#job-detail audio'); audio.muted = true; await audio.play(); await new Promise(r => setTimeout(r, 150)); const result = { duration: audio.duration, advancing: audio.currentTime > 0, playing: !audio.paused }; audio.pause(); return result; })()");
+  assert.equal(playback.duration, 1);
+  assert.equal(playback.advancing, true);
+  assert.equal(playback.playing, true);
   const audioURL = await cdp.evaluate("document.querySelector('#job-detail audio').src");
   assert.equal((await fetch(audioURL, { headers: { Range: "bytes=0-15" } })).status, 206);
   await cdp.evaluate("document.querySelector('#close-dialog').click(); true");
@@ -90,7 +107,7 @@ try {
   assert.equal(await cdp.evaluate("document.documentElement.scrollWidth <= innerWidth"), true);
   await cdp.call("Page.captureScreenshot", { format: "png", captureBeyondViewport: true }).then(r => writeFileSync(path.join(work, "mobile.png"), Buffer.from(r.data, "base64")));
   assert.deepEqual(cdp.errors, []);
-  const result = { result: "PASS", checks: ["server_http", "browser_submit_two_jobs", "demo_fifo_completion", "artifact_dialog", "audio_range", "mobile_no_overflow", "no_browser_errors"], screenshots: [path.join(work, "desktop.png"), path.join(work, "mobile.png")] };
+  const result = { result: "PASS", checks: ["server_http", "browser_submit_two_jobs", "demo_fifo_completion", "artifact_dialog", "audio_range", "independent_export_checkboxes", "export_options_persisted", "wav_playback", "mobile_no_overflow", "no_browser_errors"], screenshots: [path.join(work, "desktop.png"), path.join(work, "mobile.png")] };
   writeFileSync(path.join(work, "result.json"), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result));
 } finally {

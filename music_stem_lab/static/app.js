@@ -2,9 +2,9 @@
 const $ = (selector) => document.querySelector(selector);
 const state = { capabilities: null, offset: 0, limit: 20, busy: false, fingerprint: null, key: null, signature: null, dialogJob: null };
 const labels = { queued: "排隊中", running: "處理中", publishing: "儲存中", recovering: "待恢復", completed: "已完成", failed: "失敗", cancelled: "已取消", deleting: "刪除中" };
-const modes = { download_audio: "下載音訊", remove_vocals: "去人聲", remove_guitar: "去吉他" };
+const modes = { download_audio: "下載音訊", separate: "模型分軌", remove_vocals: "去人聲", remove_guitar: "去吉他" };
 const stages = { fetching: "取得來源", decoding: "解碼音訊", separating: "分離音源", mixing: "製作伴奏", verifying: "驗證檔案" };
-const kinds = { source: "來源音訊", vocals: "人聲", no_vocals: "無人聲伴奏", guitar: "吉他", no_guitar: "無吉他伴奏", manifest: "處理紀錄" };
+const kinds = { source: "來源音訊", drums: "鼓", bass: "低音", piano: "鋼琴", other: "其他音源", vocals: "人聲", no_vocals: "無人聲伴奏", guitar: "吉他", no_guitar: "無吉他伴奏", manifest: "處理紀錄" };
 function el(tag, className, text) { const n = document.createElement(tag); if (className) n.className = className; if (text !== undefined) n.textContent = text; return n; }
 function size(bytes) { if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KiB"; if (bytes < 1024 ** 3) return (bytes / 1024 ** 2).toFixed(1) + " MiB"; return (bytes / 1024 ** 3).toFixed(2) + " GiB"; }
 function date(seconds) { return new Date(seconds * 1000).toLocaleString("zh-TW", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }); }
@@ -16,9 +16,16 @@ async function api(path, options = {}) {
   return body;
 }
 function toast(message) { $("#toast").textContent = message; $("#toast").hidden = false; clearTimeout(toast.timer); toast.timer = setTimeout(() => { $("#toast").hidden = true; }, 4500); }
+function selectedExports() { return [...document.querySelectorAll('input[name="extra_exports"]:checked')].map(input => input.value); }
+function exportSummary(job) {
+  if (job.mode !== "separate") return "";
+  const selected = job.extra_exports || [];
+  return selected.length ? "額外輸出：" + selected.map(kind => kinds[kind] || kind).join("、") : "僅原生音軌，無額外伴奏";
+}
 function executionNote() {
   const demo = $("#demo").checked;
   const mode = document.querySelector('input[name="mode"]:checked').value;
+  $("#extra-exports").disabled = mode !== "separate";
   $("#execution-note").textContent = demo ? "示範會產生合成音，僅驗證排隊與檔案流程。" : mode !== "download_audio" ? "此工作會保留在佇列，等待另一台電腦的模型執行器。" : state.capabilities?.download_enabled ? "將取得原始音訊格式；請確認你具有適當使用權利。" : "來源下載尚未啟用；提交後會排隊等待執行器。";
 }
 async function capabilities() {
@@ -49,6 +56,7 @@ function renderJob(job) {
   heading.append(title, el("div", "job-meta", date(job.created_at) + " · 第 " + job.attempt_count + " 次執行"));
   top.append(heading, el("span", "badge " + job.state, labels[job.state]));
   row.append(top, el("p", "job-description", description(job)));
+  if (job.mode === "separate") row.append(el("p", "job-export-summary", exportSummary(job)));
   if (job.progress !== null && job.state === "running") { const progress = el("progress"); progress.max = 100; progress.value = job.progress; progress.setAttribute("aria-label", "工作進度"); row.append(progress); }
   if (job.error_message && job.state === "failed") row.append(el("p", "job-error", job.error_message));
   const actions = el("div", "job-actions");
@@ -69,6 +77,7 @@ async function showDetail(id) {
   if (job.execution_kind === "demo") fragment.append(el("div", "notice", "示範結果：以下是合成測試音，沒有下載或分離 YouTube 歌曲。"));
   fragment.append(el("p", "detail-meta", modes[job.mode] + " · " + job.video_id + " · " + labels[job.state]), el("p", "detail-meta", "工作 ID：" + job.id));
   const sourceLink = el("a", "", "查看來源影片"); sourceLink.href = job.source_url; sourceLink.target = "_blank"; sourceLink.rel = "noopener noreferrer"; fragment.append(sourceLink);
+  if (job.mode === "separate") fragment.append(el("p", "detail-meta", exportSummary(job)));
   if (!job.artifacts.length) fragment.append(el("p", "detail-meta", "目前尚無已發布檔案。"));
   for (const artifact of job.artifacts) {
     const box = el("div", "artifact"), title = el("div", "artifact-title");
@@ -111,7 +120,8 @@ $("#job-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const urls = $("#urls").value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
   if (!urls.length || urls.length > 20) { toast("請輸入 1 至 20 筆網址。"); return; }
-  const payload = { urls, mode: document.querySelector('input[name="mode"]:checked').value, execution_kind: $("#demo").checked ? "demo" : "real" };
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  const payload = { urls, mode, extra_exports: mode === "separate" ? selectedExports() : [], execution_kind: $("#demo").checked ? "demo" : "real" };
   const fingerprint = JSON.stringify(payload);
   if (state.fingerprint !== fingerprint || !state.key) { state.fingerprint = fingerprint; state.key = crypto.randomUUID(); }
   $("#submit").disabled = true;
@@ -124,7 +134,7 @@ $("#job-form").addEventListener("submit", async (event) => {
 });
 function updateCount() { $("#url-count").textContent = $("#urls").value.split(/\r?\n/).filter(s => s.trim()).length + " 筆網址"; }
 $("#urls").addEventListener("input", updateCount);
-$("#example").addEventListener("click", () => { $("#urls").value = "https://youtu.be/EXAMPLE0001\nhttps://www.youtube.com/watch?v=EXAMPLE0002"; $("#demo").checked = true; updateCount(); executionNote(); });
+$("#example").addEventListener("click", () => { $("#urls").value = "https://youtu.be/EXAMPLE0001\nhttps://www.youtube.com/watch?v=EXAMPLE0002"; $("#demo").checked = true; document.querySelector('input[value="separate"]').checked = true; updateCount(); executionNote(); });
 for (const radio of document.querySelectorAll('input[name="mode"]')) radio.addEventListener("change", executionNote);
 $("#demo").addEventListener("change", executionNote);
 $("#filter").addEventListener("change", () => { state.offset = 0; refresh(true); });

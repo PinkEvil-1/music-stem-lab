@@ -14,8 +14,12 @@
 <div class="field-note"><span id="url-count">0 筆網址</span><button type="button" id="example" class="text-button">填入示範網址</button></div>
 <fieldset><legend>處理方式</legend>
 <label class="mode-option"><input type="radio" name="mode" value="download_audio" checked><span><strong>僅下載音訊</strong><small>保留來源格式，不執行分軌</small></span><span class="mode-symbol" aria-hidden="true">↓</span></label>
-<label class="mode-option"><input type="radio" name="mode" value="remove_vocals"><span><strong>去人聲</strong><small>保留樂器伴奏</small></span><span class="mode-symbol" aria-hidden="true">≋</span></label>
-<label class="mode-option"><input type="radio" name="mode" value="remove_guitar"><span><strong>去吉他</strong><small>移除所有一般吉他，保留人聲與 bass</small></span><span class="mode-symbol" aria-hidden="true">⌁</span></label>
+<label class="mode-option"><input type="radio" name="mode" value="separate"><span><strong>模型分軌</strong><small>保留模型提供的所有原生音軌</small></span><span class="mode-symbol" aria-hidden="true">≋</span></label>
+</fieldset>
+<fieldset id="extra-exports" disabled><legend>額外輸出 <span class="hint">選填，可同時勾選</span></legend>
+<label class="export-option"><input id="export-no-vocals" type="checkbox" name="extra_exports" value="no_vocals"><span><strong>去人聲版本</strong><small>額外產生可直接播放的無人聲伴奏</small></span></label>
+<label class="export-option"><input id="export-no-guitar" type="checkbox" name="extra_exports" value="no_guitar"><span><strong>去吉他版本</strong><small>額外產生可直接播放的無吉他伴奏</small></span></label>
+<p class="export-note">原生音軌都會保留；兩項都勾選時，分別輸出兩個伴奏檔。</p>
 </fieldset>
 <label class="demo-toggle"><input id="demo" type="checkbox"><span>使用示範流程<small>只產生合成測試音，不下載或分離歌曲。</small></span></label>
 <p id="execution-note" class="execution-note"></p><button class="primary" id="submit" type="submit">加入工作佇列 <span aria-hidden="true">↗</span></button>

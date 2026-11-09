@@ -38,7 +38,7 @@ https://github.com/facebookresearch/demucs
 
 模型原生 stems 是各類別的音訊估計。
 模型原生音軌全部保留。網站會提供兩個獨立勾選項，選擇是否額外產生 no_vocals.wav 或 no_guitar.wav；預設不勾，雙選時分別輸出兩個伴奏。
-後端 separate／extra_exports 契約已實作；網頁勾選由 T029 接續，真正的混音仍待遠端模型接入。
+後端 separate／extra_exports 契約與網頁獨立勾選均已實作，真正的混音仍待遠端模型接入。
 
 網站也會保存來源音訊及 manifest.json；manifest 是處理紀錄，包含模式、版本、檔案清單與驗證資訊，不需要匯入 DAW。
 一次打包成 ZIP 可以方便下載，但仍只是裝著多個檔案的壓縮包；目前沒有實作 ZIP 匯出。
