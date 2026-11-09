@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101715"><title>Music Stem Lab · 音樂工作室</title><link rel="icon" type="image/svg+xml" href="/static/favicon.svg"><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
+<body>
+<header class="topbar"><a class="brand" href="/"><span class="brand-icon" aria-hidden="true">≋</span> MUSIC STEM LAB</a><div class="local-badge"><span class="dot"></span>私人工作室 <span class="version">v0.1</span></div></header>
+<main>
+<section class="intro"><div><div class="eyebrow">YOUR PERSONAL AUDIO WORKSPACE</div><h1>留下你想聽見的聲音<span>。</span></h1><p>把音樂加入工作佇列，整理你的練習伴奏與分軌檔案。</p></div><div class="sound-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></section>
+<div id="service-note" class="notice" role="status">正在連接工作室…</div>
+<div class="workspace"><aside>
+<section class="panel composer"><div class="section-heading"><span class="section-number">01</span><h2>新增音樂工作</h2></div>
+<form id="job-form">
+<label for="urls">YouTube 網址 <span class="hint">每行一筆，最多 20 筆</span></label>
+<textarea id="urls" name="urls" rows="6" placeholder="https://www.youtube.com/watch?v=…&#10;https://youtu.be/…" maxlength="42000" required></textarea>
+<div class="field-note"><span id="url-count">0 筆網址</span><button type="button" id="example" class="text-button">填入示範網址</button></div>
+<fieldset><legend>處理方式</legend>
+<label class="mode-option"><input type="radio" name="mode" value="download_audio" checked><span><strong>僅下載音訊</strong><small>保留來源格式，不執行分軌</small></span><span class="mode-symbol" aria-hidden="true">↓</span></label>
+<label class="mode-option"><input type="radio" name="mode" value="remove_vocals"><span><strong>去人聲</strong><small>保留樂器伴奏</small></span><span class="mode-symbol" aria-hidden="true">≋</span></label>
+<label class="mode-option"><input type="radio" name="mode" value="remove_guitar"><span><strong>去吉他</strong><small>移除所有一般吉他，保留人聲與 bass</small></span><span class="mode-symbol" aria-hidden="true">⌁</span></label>
+</fieldset>
+<label class="demo-toggle"><input id="demo" type="checkbox"><span>使用示範流程<small>只產生合成測試音，不下載或分離歌曲。</small></span></label>
+<p id="execution-note" class="execution-note"></p><button class="primary" id="submit" type="submit">加入工作佇列 <span aria-hidden="true">↗</span></button>
+<div id="submission" class="submission" role="status" aria-live="polite"></div>
+</form></section>
+<section class="storage-panel"><div><span>本機儲存</span><strong id="storage-label">讀取中</strong></div><progress id="storage-meter" max="100" value="0" aria-label="儲存配額使用率"></progress><p>來源、分軌與處理紀錄保存在本機。<br>刪除工作會一併移除該工作的檔案。</p></section>
+</aside><section class="queue-area">
+<div class="stats"><div><span>排隊中</span><strong id="count-queued">0</strong></div><div><span>處理中</span><strong id="count-running">0</strong></div><div><span>已完成</span><strong id="count-completed">0</strong></div></div>
+<section class="panel queue-panel"><div class="queue-heading"><div class="section-heading"><span class="section-number">02</span><h2>工作佇列</h2></div><button id="refresh" class="secondary" type="button">重新整理</button></div>
+<div class="queue-toolbar"><label for="filter" class="sr-only">狀態篩選</label><select id="filter"><option value="">全部工作</option><option value="queued">排隊中</option><option value="running">處理中</option><option value="completed">已完成</option><option value="failed">失敗</option><option value="cancelled">已取消</option><option value="recovering">待恢復</option></select><span id="result-count">依提交時間顯示</span></div>
+<p id="queue-error" class="error" role="alert" hidden></p><div id="jobs"><div class="empty"><div class="empty-symbol" aria-hidden="true">≋</div><h3>你的下一首，從這裡開始。</h3><p>在左側貼上網址，建立第一筆音樂工作。</p></div></div>
+<div class="pagination"><button class="secondary" id="previous" disabled>上一頁</button><span id="page-label">第 1 頁</span><button class="secondary" id="next" disabled>下一頁</button></div></section>
+<p class="queue-footnote"><span class="dot"></span>工作會逐筆執行；關閉網頁後，背景處理仍會繼續。</p>
+</section></div></main>
+<footer><span>MUSIC STEM LAB</span><span>為練習，留一個自己的聲音空間。</span></footer>
+<dialog id="job-dialog"><div class="dialog-top"><h2>工作詳情</h2><button id="close-dialog" class="secondary" aria-label="關閉工作詳情">關閉</button></div><div id="job-detail"></div></dialog><div id="toast" role="status" aria-live="polite" hidden></div>
+</body></html>
