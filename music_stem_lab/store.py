@@ -5,7 +5,7 @@ import sqlite3
 import time
 import uuid
 
-from .domain import ACTIVE, MODES, STAGES, Problem, Settings, video_id
+from .domain import ACTIVE, MODES, STAGES, EXPORT_SOURCES, Problem, Settings, video_id, normalize_exports, normalize_stems
 
 def uid():
     return uuid.uuid4().hex
@@ -62,8 +62,17 @@ class Store:
                     job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
                     time REAL NOT NULL, state TEXT NOT NULL, message TEXT NOT NULL
                 );
-                PRAGMA user_version=1;
             """)
+            c.execute("BEGIN IMMEDIATE")
+            for table, columns in {
+                "jobs": ("extra_exports", "native_stems"),
+                "attempts": ("native_stems",),
+            }.items():
+                existing = {row["name"] for row in c.execute("PRAGMA table_info(" + table + ")")}
+                for column in columns:
+                    if column not in existing:
+                        c.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " TEXT NOT NULL DEFAULT '[]'")
+            c.execute("PRAGMA user_version=2")
 
     def connect(self):
         c = sqlite3.connect(self.path, timeout=15, factory=ClosingConnection)
@@ -101,12 +110,17 @@ class Store:
         c.execute("UPDATE counters SET value=value+1 WHERE name='queue'")
         return c.execute("SELECT value FROM counters WHERE name='queue'").fetchone()[0]
 
-    def submit(self, urls, mode, execution_kind, key):
+    def submit(self, urls, mode, execution_kind, key, extra_exports=None):
         if mode not in MODES or execution_kind not in ("real", "demo"):
             raise Problem("INVALID_MODE", "此處理模式尚未支援。", 422)
         if not 1 <= len(urls) <= self.settings.max_batch:
             raise Problem("BATCH_LIMIT", "每批需有 1 至 20 筆網址。", 422)
-        payload = json.dumps([urls, mode, execution_kind], ensure_ascii=False)
+        exports = normalize_exports(mode, extra_exports)
+        # Preserve legacy idempotency payloads for existing jobs.
+        payload_fields = [urls, mode, execution_kind]
+        if mode == "separate":
+            payload_fields.append(exports)
+        payload = json.dumps(payload_fields, ensure_ascii=False)
         with self.transaction() as c:
             existing = c.execute("SELECT * FROM batches WHERE key=?", (key,)).fetchone()
             if existing:
@@ -125,6 +139,7 @@ class Store:
                     (id,batch_id,video_id,mode,execution_kind,state,sequence,created_at,updated_at)
                     VALUES (?,?,?,?,?,'queued',?,?,?)""",
                     (job_id, batch, vid, mode, execution_kind, self.next_sequence(c), now, now))
+                c.execute("UPDATE jobs SET extra_exports=? WHERE id=?", (json.dumps(exports), job_id))
                 self.event(c, job_id, "queued", "已加入佇列")
                 items.append({"index": index, "job_id": job_id})
             result = {"batch_id": batch, "items": items}
@@ -142,7 +157,8 @@ class Store:
                     WHERE id=?""", (timestamp(), row["id"]))
                 self.event(c, row["id"], "recovering", "心跳逾時，保留執行權以免重複處理")
 
-    def claim(self, worker_id, execution_kind, modes):
+    def claim(self, worker_id, execution_kind, modes, native_stems=None):
+        stems = normalize_stems(native_stems)
         self.sweep_expired()
         with self.transaction() as c:
             if c.execute("SELECT 1 FROM jobs WHERE state IN ('running','publishing','recovering')").fetchone():
@@ -152,13 +168,20 @@ class Store:
             if not row or row["execution_kind"] != execution_kind or row["mode"] not in modes:
                 return None
             job = dict(row)
+            if job["mode"] == "separate":
+                exports = json.loads(job["extra_exports"])
+                if not stems or any(EXPORT_SOURCES[value] not in stems for value in exports):
+                    return None
+            else:
+                stems = []
             attempt_id, token, now = uid(), uid(), timestamp()
             c.execute("""UPDATE jobs SET state='running',stage='fetching',updated_at=?,
                 attempt_count=attempt_count+1,attempt_id=?,token=?,worker_id=?,
                 lease_until=?,progress=NULL,error_code=NULL,error_message=NULL,publish_json=NULL WHERE id=?""",
                 (now, attempt_id, token, worker_id, now + self.settings.lease_seconds, job["id"]))
-            c.execute("""INSERT INTO attempts(id,job_id,worker_id,started_at,execution_kind)
-                VALUES (?,?,?,?,?)""", (attempt_id, job["id"], worker_id, now, execution_kind))
+            c.execute("UPDATE jobs SET native_stems=? WHERE id=?", (json.dumps(stems), job["id"]))
+            c.execute("""INSERT INTO attempts(id,job_id,worker_id,started_at,execution_kind,native_stems)
+                VALUES (?,?,?,?,?,?)""", (attempt_id, job["id"], worker_id, now, execution_kind, json.dumps(stems)))
             self.event(c, job["id"], "running", "執行器已領取工作")
             job = self.row(c, job["id"])
             return {**self.public(job), "attempt_token": token}
@@ -254,6 +277,8 @@ class Store:
                   "cancel_requested", "error_code", "error_message", "progress", "lease_until")
         result = {key: job[key] for key in fields}
         result["cancel_requested"] = bool(result["cancel_requested"])
+        result["extra_exports"] = json.loads(job.get("extra_exports", "[]"))
+        result["native_stems"] = json.loads(job.get("native_stems", "[]"))
         result["source_url"] = "https://www.youtube.com/watch?v=" + job["video_id"]
         return result
 
@@ -279,8 +304,10 @@ class Store:
             result["events"] = [dict(e) for e in c.execute(
                 "SELECT time,state,message FROM events WHERE job_id=? ORDER BY id DESC LIMIT 30", (job_id,))]
             result["attempts"] = [dict(a) for a in c.execute(
-                "SELECT id,worker_id,started_at,finished_at,outcome,execution_kind FROM attempts WHERE job_id=? ORDER BY started_at",
+                "SELECT id,worker_id,started_at,finished_at,outcome,execution_kind,native_stems FROM attempts WHERE job_id=? ORDER BY started_at",
                 (job_id,))]
+            for attempt in result["attempts"]:
+                attempt["native_stems"] = json.loads(attempt["native_stems"])
             return result
 
     def listing(self, state=None, limit=50, offset=0):

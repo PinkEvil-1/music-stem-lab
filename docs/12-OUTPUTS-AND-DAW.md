@@ -37,10 +37,8 @@ https://github.com/facebookresearch/demucs
 ## 模型輸出與網站產物的差別
 
 模型原生 stems 是各類別的音訊估計。
-網站還會依選擇的模式產生衍生伴奏：
-- remove_vocals：人聲軌與 no_vocals.wav。
-- remove_guitar：吉他類別軌與 no_guitar.wav。
-- 未來 multi_stem：所選模型能力表指定的原生分軌。
+模型原生音軌全部保留。網站會提供兩個獨立勾選項，選擇是否額外產生 no_vocals.wav 或 no_guitar.wav；預設不勾，雙選時分別輸出兩個伴奏。
+後端 separate／extra_exports 契約已實作；網頁勾選由 T029 接續，真正的混音仍待遠端模型接入。
 
 網站也會保存來源音訊及 manifest.json；manifest 是處理紀錄，包含模式、版本、檔案清單與驗證資訊，不需要匯入 DAW。
 一次打包成 ZIP 可以方便下載，但仍只是裝著多個檔案的壓縮包；目前沒有實作 ZIP 匯出。
@@ -49,5 +47,11 @@ https://github.com/facebookresearch/demucs
 
 已完成的真實下載只有 source WebM 與 manifest，尚未執行模型。
 示範 WAV 是合成測試音，不能當作真實歌曲分軌結果。
-目前 API 提供去人聲／去吉他兩種分離工作的固定必要產物，尚未開放 multi_stem 原生多軌輸出。
+目前 API 已支援 separate 的原生類別與選填伴奏產物契約，示範仍為合成音；真實模型尚未接入。
 模型在另一台電腦接入後，才會產生真正的分離音檔，並驗證時基、音質與 DAW 匯入結果。
+
+## WAV 可以直接播放嗎？
+
+本專案採 PCM WAV，是一般可直接播放的音訊檔，常見桌面播放器及現代瀏覽器可播放；不用先放入 DAW 或轉成 MP3。網站用 audio 播放器試聽，實際支援仍受編碼與瀏覽器影響。PCM WAV 通常未壓縮，同長度檔案會比常見有損 MP3／AAC 大。
+
+參考：https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/Containers

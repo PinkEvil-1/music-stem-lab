@@ -7,7 +7,7 @@ import shutil
 import threading
 import wave
 
-from .domain import MODES, Problem
+from .domain import MODES, Problem, required_artifacts
 from .store import Store, timestamp, uid
 from .decode import validate_decode
 
@@ -51,7 +51,7 @@ class Artifacts:
             raise Problem("INVALID_FORMAT", "不支援此音訊格式。", 422)
         with self.store.transaction() as c:
             job = self.store.owned(c, job_id, token)
-            if job["state"] != "running" or kind not in MODES[job["mode"]]:
+            if job["state"] != "running" or kind not in required_artifacts(job):
                 raise Problem("INVALID_ARTIFACT", "此階段不接受此輸出檔案。", 422)
             if kind != "source" and extension != ".wav":
                 raise Problem("INVALID_FORMAT", "分離輸出需為 PCM WAV。", 422)
@@ -147,7 +147,7 @@ class Artifacts:
                 raise Problem("STATE_CONFLICT", "工作不在可發布狀態。")
             rows = [dict(r) for r in c.execute(
                 "SELECT * FROM artifacts WHERE attempt_id=?", (job["attempt_id"],))]
-            if {r["kind"] for r in rows} != set(MODES[job["mode"]]):
+            if {r["kind"] for r in rows} != set(required_artifacts(job)):
                 raise Problem("MISSING_ARTIFACTS", "必要輸出尚未上傳完整。", 422)
             wav_specs = []
             for row in rows:
@@ -163,6 +163,8 @@ class Artifacts:
                 "schema_version": 1, "job_id": job_id, "attempt_id": job["attempt_id"],
                 "video_id": job["video_id"], "mode": job["mode"],
                 "execution_kind": job["execution_kind"], "simulated": job["execution_kind"] == "demo",
+                "extra_exports": json.loads(job["extra_exports"]),
+                "native_stems": json.loads(job["native_stems"]),
                 "profile": profile, "completed_at": timestamp(),
                 "artifacts": [{"id": r["id"], "kind": r["kind"], "filename": Path(r["path"]).name,
                                "size": r["size"], "sha256": r["sha256"],

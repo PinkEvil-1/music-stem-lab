@@ -5,6 +5,7 @@ import re
 from urllib.parse import parse_qs, urlsplit
 
 MODES = {
+    "separate": (),
     "download_audio": ("source",),
     "remove_vocals": ("source", "vocals", "no_vocals"),
     "remove_guitar": ("source", "guitar", "no_guitar"),
@@ -43,6 +44,38 @@ def video_id(value: str) -> str:
         return candidate
     except (ValueError, TypeError):
         raise Problem("INVALID_URL", "請提供單一影片的 HTTPS YouTube 網址。", 422) from None
+
+
+EXPORT_SOURCES = {"no_vocals": "vocals", "no_guitar": "guitar"}
+DEMO_STEMS = ("vocals", "drums", "bass", "guitar", "piano", "other")
+
+def normalize_exports(mode, values):
+    values = list(values or [])
+    if any(value not in EXPORT_SOURCES for value in values) or (values and mode != "separate"):
+        raise Problem("INVALID_EXPORTS", "額外伴奏選項僅適用模型分軌工作。", 422)
+    return sorted(set(values))
+
+def normalize_stems(values):
+    values = list(values or [])
+    reserved = {"source", "manifest", *EXPORT_SOURCES}
+    if len(values) > 32 or len(set(values)) != len(values) or any(
+        not isinstance(value, str) or not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", value)
+        or value in reserved for value in values
+    ):
+        raise Problem("INVALID_STEMS", "模型原生音軌名稱或數量無效。", 422)
+    return values
+
+def required_artifacts(job):
+    if job["mode"] != "separate":
+        return MODES[job["mode"]]
+    stems, exports = job.get("native_stems", []), job.get("extra_exports", [])
+    # Database records store JSON; public worker jobs carry arrays.
+    import json
+    stems = json.loads(stems) if isinstance(stems, str) else stems
+    exports = json.loads(exports) if isinstance(exports, str) else exports
+    if not stems:
+        raise Problem("MISSING_MODEL_CAPABILITIES", "執行器尚未提供模型音軌能力。", 422)
+    return ("source", *stems, *exports)
 
 @dataclass
 class Settings:

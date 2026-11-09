@@ -44,7 +44,7 @@ complete 目前信任受控 worker 提供的 profile，尚未實作權重白名�
 
 未來的模型能力登錄及 multi_stem 契約依所選模型／權重原生提供的軌數與類別，不固定要求四軌或六軌，不增加同類樂器個體分離。
 R003／R004 的必要能力仍需符合；沒有 guitar 的 profile 不能接 remove_guitar，不能用 other 冒充。
-目前 API 仍只有 download_audio、remove_vocals、remove_guitar；multi_stem 的能力登錄與動態產物契約尚待遠端模型階段實作。本次需求變更沒有新增執行能力。
+依 D014 新增 separate 與 extra_exports；worker 以 native_stems 宣告並凍結模型原生類別，動態產物驗證已實作。舊 remove_vocals／remove_guitar 保留相容。正式模型程式與品質驗證仍待另一台電腦，詳見 13-EXTRA-EXPORTS.md。
 
 ## 領取與執行
 
@@ -64,6 +64,7 @@ R003／R004 的必要能力仍需符合；沒有 guitar 的 profile 不能接 re
 | mode | 音檔種類 |
 | --- | --- |
 | download_audio | source |
+| separate | source、全部 native_stems、已選 extra_exports |
 | remove_vocals | source、vocals、no_vocals |
 | remove_guitar | source、guitar、no_guitar |
 

@@ -10,7 +10,7 @@ import time
 import wave
 
 from .artifacts import Artifacts
-from .domain import MODES, STAGES, Problem
+from .domain import MODES, STAGES, DEMO_STEMS, Problem, required_artifacts
 from .store import Store, uid
 
 def demo_audio(frequency=440):
@@ -50,7 +50,7 @@ class LocalWorker:
             job = None
             try:
                 self.files.capacity()
-                job = self.store.claim(self.worker_id, "demo", list(MODES))
+                job = self.store.claim(self.worker_id, "demo", list(MODES), DEMO_STEMS)
                 if job is None and self.settings.enable_download:
                     job = self.store.claim(self.worker_id, "real", ["download_audio"])
                 if job:
@@ -67,7 +67,7 @@ class LocalWorker:
                     self.checkpoint(job, stage, (i / len(STAGES)) * 100)
                     if self.stop.wait(self.settings.demo_stage_seconds):
                         raise Problem("LOCAL_SHUTDOWN", "執行器停止。")
-                for i, kind in enumerate(MODES[job["mode"]]):
+                for i, kind in enumerate(required_artifacts(job)):
                     self.files.put(job["id"], job["attempt_token"], kind, ".wav", demo_audio(330 + i * 110))
                 self.files.publish(job["id"], job["attempt_token"],
                                    {"profile_id": "synthetic-demo-v1", "version": "1",

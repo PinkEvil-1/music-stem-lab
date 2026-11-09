@@ -12,20 +12,22 @@ from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from .artifacts import Artifacts
-from .domain import MODES, Problem, Settings
+from .domain import MODES, EXPORT_SOURCES, Problem, Settings
 from .local_worker import LocalWorker
 from .store import Store
 from .maintenance import ServiceLock
 
 class Batch(BaseModel):
     urls: list[Annotated[str, Field(max_length=2048)]] = Field(min_length=1, max_length=20)
-    mode: Literal["download_audio", "remove_vocals", "remove_guitar"]
+    mode: Literal["download_audio", "separate", "remove_vocals", "remove_guitar"]
     execution_kind: Literal["real", "demo"] = "real"
+    extra_exports: list[Literal["no_vocals", "no_guitar"]] = Field(default_factory=list, max_length=2)
     idempotency_key: str = Field(min_length=8, max_length=128)
 
 class Claim(BaseModel):
     worker_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
-    modes: list[Literal["download_audio", "remove_vocals", "remove_guitar"]] = Field(min_length=1, max_length=3)
+    modes: list[Literal["download_audio", "separate", "remove_vocals", "remove_guitar"]] = Field(min_length=1, max_length=4)
+    native_stems: list[Annotated[str, Field(max_length=64)]] = Field(default_factory=list, max_length=32)
 
 class Heartbeat(BaseModel):
     stage: Literal["fetching", "decoding", "separating", "mixing", "verifying"]
@@ -140,9 +142,9 @@ def create_app(settings: Settings | None = None):
             "download_enabled": settings.enable_download,
             "modes": [
                 {"id": "download_audio", "label": "僅下載音訊", "execution": "local_download" if settings.enable_download else "waiting_worker"},
-                {"id": "remove_vocals", "label": "去人聲", "execution": "waiting_model_worker"},
-                {"id": "remove_guitar", "label": "去吉他", "execution": "waiting_model_worker"},
+                {"id": "separate", "label": "模型分軌", "execution": "waiting_model_worker"},
             ],
+            "extra_exports": [{"id": key, "required_stem": value} for key, value in EXPORT_SOURCES.items()],
             "demo_available": settings.local_workers,
             "limits": {"max_batch": settings.max_batch, "max_duration_seconds": settings.max_duration_seconds,
                        "max_file_bytes": settings.max_upload_bytes, "quota_bytes": settings.quota_bytes},
@@ -154,7 +156,7 @@ def create_app(settings: Settings | None = None):
         if body.execution_kind == "demo" and not settings.local_workers:
             raise Problem("DEMO_DISABLED", "此服務未啟用示範執行器。", 422)
         files.capacity()
-        result = store.submit(body.urls, body.mode, body.execution_kind, body.idempotency_key)
+        result = store.submit(body.urls, body.mode, body.execution_kind, body.idempotency_key, body.extra_exports)
         return JSONResponse(result, status_code=202 if any("job_id" in i for i in result["items"]) else 422)
 
     @app.get("/api/jobs")
@@ -194,7 +196,7 @@ def create_app(settings: Settings | None = None):
     @app.post("/api/worker/claim", dependencies=[worker_dependency])
     def claim(body: Claim):
         files.capacity()
-        return {"job": store.claim(body.worker_id, "real", body.modes), "lease_seconds": settings.lease_seconds}
+        return {"job": store.claim(body.worker_id, "real", body.modes, body.native_stems), "lease_seconds": settings.lease_seconds}
 
     @app.post("/api/worker/jobs/{job_id}/heartbeat", dependencies=[worker_dependency])
     def heartbeat(job_id: str, body: Heartbeat, x_attempt_token: Annotated[str, Header()]):

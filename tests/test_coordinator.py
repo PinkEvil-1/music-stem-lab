@@ -280,7 +280,11 @@ def test_demo_explicit_and_no_network(tmp_path, monkeypatch):
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
             jobs = [client.get("/api/jobs/" + i).json() for i in ids]
-            assert sum(j["state"] in ("running", "publishing") for j in jobs) <= 1
+            # Individual HTTP reads span different moments; count active jobs
+            # in one SQLite snapshot instead of combining stale observations.
+            with app.state.store.connect() as c:
+                active = c.execute("SELECT COUNT(*) FROM jobs WHERE state IN ('running','publishing')").fetchone()[0]
+            assert active <= 1
             if all(j["state"] == "completed" for j in jobs):
                 break
             time.sleep(0.05)
