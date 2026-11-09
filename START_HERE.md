@@ -1,35 +1,23 @@
 # Music Stem Lab：規格與接手入口
 
-更新日期：2026-11-09（Asia/Taipei）。階段：規格草案與技術驗證規劃，尚未開發。
+更新：2026-11-09。網站與本機工作協調器已實作；模型改由另一台電腦執行，現階段延後。
 
-這是一個獨立專案，供個人於本機或私人伺服器使用。使用者貼上 YouTube 網址後，系統依序取得音訊、分離人聲或樂器、儲存分軌及指定的伴奏版本。多筆工作進入持久化佇列，逐筆執行。
+先閱讀 [README](README.md) 啟動網站。示範模式只產生合成測試音，可驗證排隊、檔案發布、試聽與下載，不代表音樂分離已完成。
 
-本目錄目前只有文字規格與追蹤文件。沒有可啟動的網站、模型、下載器或已完成的音訊實驗。它不依賴 GameServer，也不整合遊戲服務。
+## 接手順序
 
-## 核心能力與限制
+1. [Agent 規則](AGENTS.md)。
+2. [接手狀態](docs/00-HANDOFF.md)：最新階段、執行方式與下一步。
+3. [任務追蹤](docs/06-TASKS.md) 與 [決策](docs/07-DECISIONS.md)。
+4. [遠端 worker 契約](docs/11-REMOTE-WORKER.md)：本輪跨機邊界與實際行為。
+5. [本機驗證證據](docs/evidence/LOCAL-001.md)。
+6. 依任務閱讀 [需求](docs/01-PRODUCT-SPEC.md)、[可行性](docs/02-FEASIBILITY.md)、[設計](docs/03-TECHNICAL-DESIGN.md)、[流程](docs/04-WORKFLOWS.md) 與 [驗收](docs/05-VALIDATION-PLAN.md)。
 
-- 去人聲：必要功能，須保留獨立人聲軌與無人聲版本。
-- 去吉他：必要功能，指盡量消除所有一般吉他、保留人聲與其他樂器；低音吉他歸 bass，預設保留。
-- 多樂器分軌：可行，但能力取決於實際模型與權重，先驗證再承諾品質。
-- 多把吉他：第一版合併成 guitar 類別處理，不承諾每把吉他獨立成軌。
-- 模型產出是估計音源，可能有殘留及誤傷，不是恢復錄音室原始軌。
+## 文件狀態
 
-## 建議閱讀順序
+01–05 保存完整目標與尚待完成的驗收；11 文件說明本輪已落地的範圍及差異。
+[10 技術說明](docs/10-TECHNOLOGY-EXPLAINER.md) 為先前說明，CPU baseline 的順序已被使用者本輪決定取代。
+[來源](docs/08-SOURCES.md)、[日誌](docs/09-WORKLOG.md) 與 [模板](docs/templates/EXPERIMENT.md) 保留可回查證據。
 
-1. AGENTS.md：接手規則。
-2. docs/00-HANDOFF.md：目前狀態、下一步與未決事項。
-3. docs/01-PRODUCT-SPEC.md：需求與範圍。
-4. docs/02-FEASIBILITY.md：查證結果與吉他案例。
-5. docs/03-TECHNICAL-DESIGN.md：建議架構、資料與介面契約。
-6. docs/04-WORKFLOWS.md：工作執行與異常恢復流程。
-7. docs/05-VALIDATION-PLAN.md：實驗與驗收標準。
-8. docs/06-TASKS.md：相依任務、完成狀態與證據。
-9. docs/07-DECISIONS.md：已確認事項、假設與待決策。
-10. docs/08-SOURCES.md、docs/09-WORKLOG.md、docs/templates/：來源、工作日誌及紀錄模板。
-
-所有 .md 都是 UTF-8 純文字，可搬移到其他目錄或交由其他 Agent 接手。文件內相對連結與路徑以本目錄為根；來源網址只供查證，不授權上傳專案或使用者音訊。
-
-## 規格驅動開發原則
-
-需求 ID → 驗收案例 → 任務 ID → 實作 → 驗證證據 → 狀態更新。
-功能需求已有使用者意圖依據；細節及數值仍是草案。不得將「文件寫完」當作「產品做完」。
+所有需求、決策、任務與交接資訊採 UTF-8 純文字保存；程式與測試可納入 Git。
+音訊、資料庫、模型、秘密設定與本機測試暫存不可提交 Git。
