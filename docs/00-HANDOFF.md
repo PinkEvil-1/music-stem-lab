@@ -65,3 +65,8 @@ API：music_stem_lab/app.py；工作狀態：store.py；檔案：artifacts.py。
 
 機密／執行資料：data/、.venv/、.tmp/、models/、.env* 已排除 Git。
 環境報告 ENV-001 只是先前本機快照。產品、架構與舊技術說明若有差異，以本輪 D010 及 11 文件為準。
+
+
+## 輸出與 DAW 說明
+
+見 [分軌輸出與 DAW](12-OUTPUTS-AND-DAW.md)。音軌為模型類別的 WAV，非 DAW 專案或 MIDI；multi_stem 與真實模型結果仍未實作，不要把示例檔名當作已存在產物。

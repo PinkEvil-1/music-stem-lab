@@ -35,6 +35,7 @@ DEFERRED 表示使用者已要求先跳過；不能記為已通過。CANCELLED �
 | T006 | 建立 Git 專案 README | DONE | README、09：W003 |
 | T007 | 小任務自動提交規則與既有變更分組提交 | DONE | AGENTS、D012、W009；規則先以 62d0059 提交 |
 | T008 | 取消逐把吉他需求，改依模型原生軌數 | DONE | 規格 v0.3、D013、W010；R010／T030／Q004 已取消 |
+| T009 | 分軌產物與 DAW 匯入說明 | DONE | 12-OUTPUTS-AND-DAW.md、W011；對應 R005／R009／R011，未新增匯出需求 |
 | T010 | 本機硬體與工具盤點 | DONE | evidence/ENV-001.md；不是未來模型主機基線 |
 
 ## 模型與來源工作
