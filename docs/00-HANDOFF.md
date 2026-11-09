@@ -33,6 +33,8 @@ RTX 2070 SUPER（8 GiB）已通過 CUDA 驅動與 Demucs 六軌合成音推論�
 
 ## 如何啟動
 
+Windows 雙擊專案根目錄的 `Start Music Stem Lab.cmd`（T033）。本機路徑配置及手動啟動見 README。已完成的工作可從列表或詳情開啟結果資料夾。
+
 在專案根目錄：
 .\.venv\Scripts\python.exe -m music_stem_lab
 瀏覽 http://127.0.0.1:8000 。實際操作與備份命令見根 README。

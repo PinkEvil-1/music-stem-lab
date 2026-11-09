@@ -1,6 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 import hmac
+import os
 from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
@@ -70,6 +71,7 @@ def create_app(settings: Settings | None = None):
     settings = settings or Settings()
     store, worker = Store(settings), None
     files = Artifacts(store)
+    open_folder = getattr(os, 'startfile', None) if settings.enable_local_folder else None
     local_model_enabled = settings.local_workers and settings.model_checkpoint is not None
     worker = LocalWorker(store, files)
 
@@ -141,6 +143,7 @@ def create_app(settings: Settings | None = None):
             "version": "0.1.0", "model_inference_available": local_model_enabled,
             "remote_worker_configured": bool(settings.worker_token),
             "download_enabled": settings.enable_download,
+            "local_folder_enabled": open_folder is not None,
             "modes": [
                 {"id": "download_audio", "label": "僅下載音訊", "execution": "local_download" if settings.enable_download else "waiting_worker"},
                 {"id": "separate", "label": "模型分軌", "execution": "local_model" if local_model_enabled else "waiting_model_worker"},
@@ -183,6 +186,24 @@ def create_app(settings: Settings | None = None):
     def recover(job_id: str, body: Recover):
         files.capacity()
         return store.recover(job_id, body.old_worker_stopped)
+
+    @app.post("/api/jobs/{job_id}/open-folder", status_code=204)
+    def open_job_folder(job_id: str, x_music_stem_local: Annotated[str | None, Header()] = None):
+        if open_folder is None:
+            raise Problem("LOCAL_FOLDER_DISABLED", "此服務未啟用開啟本機資料夾。", 404)
+        if x_music_stem_local != "1":
+            raise Problem("ORIGIN_REJECTED", "請從本機工作室開啟資料夾。", 403)
+        with store.connect() as c:
+            job = store.row(c, job_id)
+        if job["state"] != "completed":
+            raise Problem("STATE_CONFLICT", "工作完成後才能開啟結果資料夾。")
+        folder = files.safe(files.directory(job) / "published")
+        if not folder.is_dir():
+            raise Problem("ARTIFACT_UNAVAILABLE", "找不到已發布的結果資料夾。", 410)
+        try:
+            open_folder(str(folder), "explore")
+        except OSError:
+            raise Problem("LOCAL_FOLDER_ERROR", "無法開啟 Windows 檔案總管。", 500) from None
 
     @app.delete("/api/jobs/{job_id}", status_code=204)
     def delete(job_id: str):

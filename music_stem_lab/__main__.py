@@ -13,6 +13,8 @@ def main():
                         help="Enable real source downloading for download_audio jobs")
     parser.add_argument("--model-checkpoint", type=Path,
                         help="Enable local CUDA separation with the verified Demucs six-stem checkpoint")
+    parser.add_argument("--enable-local-folder", action="store_true",
+                        help="Allow the local UI to open completed job folders in Windows Explorer")
     args = parser.parse_args()
     checkpoint = args.model_checkpoint.resolve() if args.model_checkpoint else None
     if checkpoint:
@@ -21,7 +23,9 @@ def main():
                            check=True, timeout=60)
         except (subprocess.SubprocessError, OSError):
             parser.exit(2, "無法啟用本機 CUDA 模型，請檢查權重與 PyTorch 環境。\n")
-    uvicorn.run(create_app(Settings(enable_download=args.enable_download, model_checkpoint=checkpoint)),
+    settings = Settings(enable_download=args.enable_download, model_checkpoint=checkpoint,
+                        enable_local_folder=args.enable_local_folder)
+    uvicorn.run(create_app(settings),
                 host="127.0.0.1", port=args.port, access_log=False)
 
 if __name__ == "__main__":

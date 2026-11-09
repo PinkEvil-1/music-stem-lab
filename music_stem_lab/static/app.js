@@ -49,6 +49,14 @@ function action(label, handler) {
   return button;
 }
 async function mutate(job, verb) { return api("/api/jobs/" + job.id + "/" + verb, { method: "POST" }); }
+function resultFolderButton(job) {
+  return action("開啟結果資料夾", () => api("/api/jobs/" + job.id + "/open-folder", {
+    method: "POST", headers: { "X-Music-Stem-Local": "1" },
+  }));
+}
+function canOpenResultFolder(job) {
+  return job.state === "completed" && state.capabilities?.local_folder_enabled;
+}
 function renderJob(job) {
   const row = el("article", "job"), top = el("div", "job-top"), heading = el("div");
   const title = el("div", "job-title", modes[job.mode] + " · " + job.video_id);
@@ -61,10 +69,11 @@ function renderJob(job) {
   if (job.error_message && job.state === "failed") row.append(el("p", "job-error", job.error_message));
   const actions = el("div", "job-actions");
   actions.append(action("詳情與檔案", () => showDetail(job.id)));
+  if (canOpenResultFolder(job)) actions.append(resultFolderButton(job));
   if (["queued", "running", "publishing"].includes(job.state) && !job.cancel_requested) actions.append(action("取消", () => mutate(job, "cancel")));
   if (["failed", "cancelled"].includes(job.state)) actions.append(action("重試", () => mutate(job, "retry")));
   if (job.state === "recovering") actions.append(action("恢復", async () => {
-    if (confirm("請先確認另一台電腦上的舊執行器及其子程序已完全停止。你確認已停止，並撤銷舊執行權嗎？")) await api("/api/jobs/" + job.id + "/recover", { method: "POST", body: JSON.stringify({ old_worker_stopped: true }) });
+    if (confirm("請先確認舊執行器及其子程序已完全停止。你確認已停止，並撤銷舊執行權嗎？")) await api("/api/jobs/" + job.id + "/recover", { method: "POST", body: JSON.stringify({ old_worker_stopped: true }) });
   }));
   if (["queued", "completed", "failed", "cancelled", "deleting"].includes(job.state)) actions.append(action("刪除", async () => {
     if (confirm("確定刪除這筆工作及其所有音訊檔案？")) { await api("/api/jobs/" + job.id, { method: "DELETE" }); if (state.dialogJob === job.id) $("#job-dialog").close(); }
@@ -78,6 +87,9 @@ async function showDetail(id) {
   fragment.append(el("p", "detail-meta", modes[job.mode] + " · " + job.video_id + " · " + labels[job.state]), el("p", "detail-meta", "工作 ID：" + job.id));
   const sourceLink = el("a", "", "查看來源影片"); sourceLink.href = job.source_url; sourceLink.target = "_blank"; sourceLink.rel = "noopener noreferrer"; fragment.append(sourceLink);
   if (job.mode === "separate") fragment.append(el("p", "detail-meta", exportSummary(job)));
+  if (canOpenResultFolder(job)) {
+    const actions = el("div", "job-actions"); actions.append(resultFolderButton(job)); fragment.append(actions);
+  }
   if (!job.artifacts.length) fragment.append(el("p", "detail-meta", "目前尚無已發布檔案。"));
   for (const artifact of job.artifacts) {
     const box = el("div", "artifact"), title = el("div", "artifact-title");
@@ -97,6 +109,7 @@ async function showDetail(id) {
 async function refresh(force = false) {
   if (state.busy) return; state.busy = true;
   try {
+    await capabilities();
     const query = new URLSearchParams({ limit: String(state.limit), offset: String(state.offset) });
     if ($("#filter").value) query.set("state", $("#filter").value);
     const data = await api("/api/jobs?" + query);
@@ -112,7 +125,7 @@ async function refresh(force = false) {
     }
     $("#previous").disabled = state.offset === 0; $("#next").disabled = state.offset + state.limit >= data.total;
     $("#page-label").textContent = "第 " + (state.offset / state.limit + 1) + " 頁";
-    $("#queue-error").hidden = true; await capabilities();
+    $("#queue-error").hidden = true;
   } catch (error) { $("#queue-error").textContent = "無法更新工作室：" + error.message; $("#queue-error").hidden = false; }
   finally { state.busy = false; }
 }

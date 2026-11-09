@@ -83,6 +83,7 @@ class Settings:
         "MUSIC_STEM_DATA_DIR", str(Path(__file__).resolve().parent.parent / "data"))))
     worker_token: str = field(default_factory=lambda: os.environ.get("MUSIC_STEM_WORKER_TOKEN", ""))
     enable_download: bool = False
+    enable_local_folder: bool = False
     model_checkpoint: Path | None = None
     local_workers: bool = True
     lease_seconds: int = 60
