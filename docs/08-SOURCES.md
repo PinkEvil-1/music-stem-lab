@@ -7,7 +7,7 @@
 | S001 | https://github.com/facebookresearch/demucs | 去人聲與六軌候選、音量策略及封存維護限制 |
 | S002 | https://github.com/ZFTurbo/Music-Source-Separation-Training | 替代分離架構及推論流程候選 |
 | S003 | https://github.com/yt-dlp/yt-dlp | 來源下載 adapter 與依賴查證 |
-| S004 | https://arxiv.org/abs/2507.01172 | 古典雙吉他同音色分離研究，不外推成通用保證 |
+| S004 | https://arxiv.org/abs/2507.01172 | 歷史研究來源；對應需求已由 D013 取消，不再安排後續工作 |
 | S005 | https://www.youtube.com/static?template=terms | 平台下載及自動存取的許可條件 |
 | S006 | https://pytorch.org/get-started/locally/ | 模型主機之後選擇相容安裝組合 |
 | S007 | https://fastapi.tiangolo.com/tutorial/testing/ | API 測試流程；實際相容性由本地測試驗證 |

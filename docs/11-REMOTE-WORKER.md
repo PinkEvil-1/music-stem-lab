@@ -40,6 +40,12 @@ worker API 使用 Authorization: Bearer <REDACTED>。實際值由環境變數 MU
 API schema 可由 /openapi.json 取得。created_at、updated_at、lease_until、events.time 及 manifest.completed_at 目前以 UTC Unix 秒數提供，前端換算為本機時間；原始規格的 ISO 8601 為尚未採用的表示方式。未設定主 token 回 503，錯誤 token 回 401，過期或被撤銷的執行嘗試回 409。
 complete 目前信任受控 worker 提供的 profile，尚未實作權重白名單或模型品質登錄；capabilities 明確回傳 model_inference_available=false。
 
+## 模型輸出範圍（D013）
+
+未來的模型能力登錄及 multi_stem 契約依所選模型／權重原生提供的軌數與類別，不固定要求四軌或六軌，不增加同類樂器個體分離。
+R003／R004 的必要能力仍需符合；沒有 guitar 的 profile 不能接 remove_guitar，不能用 other 冒充。
+目前 API 仍只有 download_audio、remove_vocals、remove_guitar；multi_stem 的能力登錄與動態產物契約尚待遠端模型階段實作。本次需求變更沒有新增執行能力。
+
 ## 領取與執行
 
 1. 以支援的 modes 呼叫 claim，沒有可領工作時退避輪詢。
