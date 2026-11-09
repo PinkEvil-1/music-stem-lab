@@ -1,75 +1,20 @@
-"""Start or stop the Windows loopback GPU workspace."""
+"""Start the Windows loopback GPU workspace."""
 import argparse
 import json
 import os
 from pathlib import Path
-import secrets
 import subprocess
 import sys
 import time
-from urllib.error import HTTPError, URLError
-from urllib.request import ProxyHandler, Request, build_opener
+from urllib.error import URLError
+from urllib.request import ProxyHandler, build_opener
 
 from music_stem_lab.windows_job import service_job
 
 ROOT = Path(__file__).resolve().parents[1]
 URL = "http://127.0.0.1:8000/"
 OPENER = build_opener(ProxyHandler({}))
-REQUIRED = ("download_enabled", "model_inference_available", "local_folder_enabled", "local_shutdown_enabled")
-TOKEN_FILE = ROOT / ".tmp" / "local-shutdown.token"
-
-
-def shutdown_token(create=False):
-    if create:
-        TOKEN_FILE.parent.mkdir(exist_ok=True)
-        try:
-            with TOKEN_FILE.open("x", encoding="ascii") as file:
-                file.write(secrets.token_urlsafe(32))
-        except FileExistsError:
-            pass
-    try:
-        token = TOKEN_FILE.read_text(encoding="ascii").strip()
-    except FileNotFoundError:
-        raise RuntimeError("Start the workspace with Start Music Stem Lab.cmd first.") from None
-    if not token:
-        raise RuntimeError("The local shutdown token could not be read. Try again.")
-    return token
-
-
-def listening():
-    report = subprocess.run(["netstat.exe", "-ano", "-p", "TCP"], check=True, timeout=5,
-                            capture_output=True, encoding="ascii", errors="ignore")
-    return any(line.split()[:4] == ["TCP", "127.0.0.1:8000", "0.0.0.0:0", "LISTENING"]
-               for line in report.stdout.splitlines())
-
-
-def stop():
-    if not listening():
-        print("Music Stem Lab is already stopped.")
-        return
-    if not ready():
-        raise RuntimeError("Could not verify the Music Stem Lab service on port 8000.")
-    request = Request(URL + "api/local/shutdown", data=b"", method="POST",
-                      headers={"X-Music-Stem-Shutdown": shutdown_token()})
-    try:
-        with OPENER.open(request, timeout=5) as response:
-            if response.status != 204:
-                raise RuntimeError("The local service did not accept the shutdown request.")
-    except HTTPError as error:
-        if error.code == 409:
-            raise RuntimeError("A job is active. Wait for it to finish or cancel it in the workspace.") from None
-        raise RuntimeError("The service on port 8000 could not be verified as this workspace.") from None
-    except (URLError, TimeoutError):
-        # The listener can close while the client is receiving the response.
-        if listening():
-            raise RuntimeError("Could not confirm that the service accepted the shutdown request.") from None
-    deadline = time.monotonic() + 15
-    while time.monotonic() < deadline:
-        if not listening():
-            print("Music Stem Lab stopped.")
-            return
-        time.sleep(.25)
-    raise RuntimeError("The workspace is still shutting down. Try again in a moment.")
+REQUIRED = ("download_enabled", "model_inference_available", "local_folder_enabled")
 
 
 def ready():
@@ -96,7 +41,6 @@ def start(job_name):
     log_path = ROOT / ".tmp" / "local-launch.log"
     log_path.parent.mkdir(exist_ok=True)
     environment = {**os.environ, "MUSIC_STEM_WORKER_TOKEN": "",
-                   "MUSIC_STEM_LOCAL_SHUTDOWN_TOKEN": shutdown_token(create=True),
                    "MUSIC_STEM_WINDOWS_JOB": job_name}
     with log_path.open("ab") as log:
         process = subprocess.Popen(
@@ -117,12 +61,8 @@ def start(job_name):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--no-browser", action="store_true")
-    parser.add_argument("--stop", action="store_true")
     args = parser.parse_args()
     try:
-        if args.stop:
-            stop()
-            return 0
         if ready():
             if not args.no_browser:
                 os.startfile(URL)

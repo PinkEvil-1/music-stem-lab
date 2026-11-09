@@ -189,3 +189,8 @@ pytest 64 項通過，含缺憑證、跨來源、佇列保留與執行中拒絕�
 啟動器保留前景視窗，以 Windows Job Object 把服務和它的子程序綁到該次啟動。關閉 CMD 視窗後連帶停止。Stop 檔仍可正常關閉。直接關視窗會中斷執行中的工作。
 在獨立 CMD、8018 埠與隔離資料實測關視窗，確認服務與一個不附著於命令視窗的模擬子程序均退出。另驗證 Stop 檔可正常退出啟動視窗。實測程序名稱為 cmd.exe 與 python.exe。pytest 64 項通過。
 [Windows Job Object 子程序與關閉行為](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects)
+
+## W022：2026-11-09，T037 移除獨立關閉檔
+
+依使用者要求，移除 STOP 啟動檔、捷徑、專用本機關閉 API 與憑證。保留啟動視窗與子程序的生命週期連結。
+回歸測試 62 項通過。以隔離 Windows CMD 實測關閉視窗會停止服務與模擬子程序。

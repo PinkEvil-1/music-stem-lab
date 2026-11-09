@@ -17,7 +17,6 @@ def main():
     parser.add_argument("--enable-local-folder", action="store_true",
                         help="Allow the local UI to open completed job folders in Windows Explorer")
     args = parser.parse_args()
-    shutdown_token = os.environ.pop("MUSIC_STEM_LOCAL_SHUTDOWN_TOKEN", "")
     job_name = os.environ.pop("MUSIC_STEM_WINDOWS_JOB", "")
     if job_name:
         from .windows_job import join_service_job
@@ -32,12 +31,7 @@ def main():
     settings = Settings(enable_download=args.enable_download, model_checkpoint=checkpoint,
                         enable_local_folder=args.enable_local_folder)
 
-    def shutdown():
-        server.should_exit = True
-
-    app = create_app(settings, shutdown=shutdown, shutdown_token=shutdown_token)
-    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=args.port, access_log=False))
-    server.run()
+    uvicorn.run(create_app(settings), host="127.0.0.1", port=args.port, access_log=False)
 
 if __name__ == "__main__":
     main()

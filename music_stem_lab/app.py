@@ -1,6 +1,5 @@
 import asyncio
 from contextlib import asynccontextmanager
-from collections.abc import Callable
 import hmac
 import os
 from pathlib import Path
@@ -8,8 +7,7 @@ from typing import Annotated, Literal
 from urllib.parse import urlsplit
 from fastapi import Depends, FastAPI, Header, Query, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, Response
-from starlette.background import BackgroundTask
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
@@ -69,15 +67,13 @@ class BodyLimit:
             return message
         return await self.app(scope, bounded_receive, send)
 
-def create_app(settings: Settings | None = None, *,
-               shutdown: Callable[[], None] | None = None, shutdown_token: str = ""):
+def create_app(settings: Settings | None = None):
     settings = settings or Settings()
     store, worker = Store(settings), None
     files = Artifacts(store)
     open_folder = getattr(os, 'startfile', None) if settings.enable_local_folder else None
     local_model_enabled = settings.local_workers and settings.model_checkpoint is not None
     worker = LocalWorker(store, files)
-    shutdown_enabled = shutdown is not None and bool(shutdown_token) and not settings.worker_token
 
     @asynccontextmanager
     async def lifespan(app):
@@ -148,7 +144,6 @@ def create_app(settings: Settings | None = None, *,
             "remote_worker_configured": bool(settings.worker_token),
             "download_enabled": settings.enable_download,
             "local_folder_enabled": open_folder is not None,
-            "local_shutdown_enabled": shutdown_enabled,
             "modes": [
                 {"id": "download_audio", "label": "僅下載音訊", "execution": "local_download" if settings.enable_download else "waiting_worker"},
                 {"id": "separate", "label": "模型分軌", "execution": "local_model" if local_model_enabled else "waiting_model_worker"},
@@ -159,16 +154,6 @@ def create_app(settings: Settings | None = None, *,
                        "max_file_bytes": settings.max_upload_bytes, "quota_bytes": settings.quota_bytes},
             "storage": files.usage(),
         }
-
-    @app.post("/api/local/shutdown", status_code=204)
-    def stop_local(x_music_stem_shutdown: Annotated[str | None, Header()] = None):
-        if not shutdown_enabled or shutdown is None:
-            raise Problem("NOT_FOUND", "此服務未啟用本機關閉功能。", 404)
-        supplied = (x_music_stem_shutdown or "").encode("utf-8")
-        if not hmac.compare_digest(supplied, shutdown_token.encode("utf-8")):
-            raise Problem("UNAUTHORIZED", "無法驗證本機關閉指令。", 403)
-        worker.stop_when_idle()
-        return Response(status_code=204, background=BackgroundTask(shutdown))
 
     @app.post("/api/jobs/batch")
     def batch(body: Batch):
