@@ -156,3 +156,8 @@ SQLite 以加欄位升至 schema 2，保留舊工作與 idempotency payload；�
 PyTorch 2.8.0+cu128 以 HTTP Range 續傳完成，官方 SHA-256 一致。隔離環境完成安裝與相依檢查。
 Demucs htdemucs_6s 在 RTX 2070 SUPER 完成 30 秒及 180 秒合成音推論，並核對 30 秒的六個 PCM WAV。
 時間、顯存、權重與測試限制見 [ENV-002](evidence/ENV-002.md)。正式素材、音質及工作執行器串接仍待續。
+
+## W016：2026-11-09，單機 CUDA 分軌試用
+
+依 D015 增加 T031。啟動時檢查固定六軌權重與 CUDA，既有本機 worker 可領取真實分軌工作、下載解碼、執行 Demucs 並發布原生軌和所選伴奏。
+60 項 pytest、10 項既有 Edge smoke、兩筆合成 WebM 來源的真實 CUDA 整合通過。正式音質與 YouTube 到分軌的實際歌曲驗收待續。見 LOCAL-MODEL-001。

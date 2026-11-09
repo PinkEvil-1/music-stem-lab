@@ -1,16 +1,20 @@
 import io
 import math
+import os
 from pathlib import Path
 import shutil
 import struct
 import subprocess
 import sys
+from tempfile import TemporaryDirectory
 import threading
 import time
 import wave
 
 from .artifacts import Artifacts
+from .decode import pcm_command
 from .domain import MODES, STAGES, DEMO_STEMS, Problem, required_artifacts
+from .model_task import PROFILE, SAMPLE_RATE, STEMS
 from .store import Store, uid
 
 def demo_audio(frequency=440):
@@ -28,6 +32,9 @@ class LocalWorker:
         self.stop = threading.Event()
         self.worker_id = "local-" + uid()
         self.thread = None
+        self.real_modes = ["download_audio"] if self.settings.enable_download else []
+        if self.settings.model_checkpoint is not None:
+            self.real_modes.extend(mode for mode in MODES if mode != "download_audio")
 
     def start(self):
         self.thread = threading.Thread(target=self.loop, name="music-local-worker", daemon=True)
@@ -51,8 +58,8 @@ class LocalWorker:
             try:
                 self.files.capacity()
                 job = self.store.claim(self.worker_id, "demo", list(MODES), DEMO_STEMS)
-                if job is None and self.settings.enable_download:
-                    job = self.store.claim(self.worker_id, "real", ["download_audio"])
+                if job is None and self.real_modes:
+                    job = self.store.claim(self.worker_id, "real", self.real_modes, STEMS)
                 if job:
                     self.execute(job)
                 else:
@@ -73,7 +80,7 @@ class LocalWorker:
                                    {"profile_id": "synthetic-demo-v1", "version": "1",
                                     "description": "合成測試音，沒有下載 YouTube 或執行音源分離"})
             else:
-                self.download(job)
+                self.process_source(job)
         except (Problem, OSError) as error:
             code = error.code if isinstance(error, Problem) else "STORAGE_LIMIT"
             state = "cancelled" if code == "CANCEL_REQUESTED" else "failed"
@@ -87,45 +94,110 @@ class LocalWorker:
             except Problem:
                 pass
 
-    def download(self, job):
+    def run_process(self, job, command, stage, timeout, failure_code, timeout_code, monitor=None):
+        self.checkpoint(job, stage)
+        process = subprocess.Popen(
+            command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+        )
+        start = time.monotonic()
+        try:
+            while process.poll() is None:
+                self.checkpoint(job, stage)
+                self.files.capacity()
+                if monitor:
+                    monitor()
+                if time.monotonic() - start > timeout:
+                    raise Problem(timeout_code, "本機處理逾時。")
+                self.stop.wait(0.25)
+            self.checkpoint(job, stage)
+            self.files.capacity()
+            if monitor:
+                monitor()
+            if process.returncode:
+                raise Problem(failure_code, "本機子程序執行失敗。")
+        finally:
+            if process.poll() is None:
+                if os.name == "nt":
+                    # The Windows venv launcher starts a separate Python process.
+                    # Terminate its tree before releasing the attempt.
+                    try:
+                        subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                       creationflags=subprocess.CREATE_NO_WINDOW, timeout=5)
+                    except (OSError, subprocess.TimeoutExpired):
+                        pass
+                if process.poll() is None:
+                    process.kill()
+                process.wait(timeout=5)
+
+    def process_source(self, job):
         token = job["attempt_token"]
         with self.store.connect() as c:
             private = self.store.row(c, job["id"])
-        target = self.files.directory(private) / "download"
-        self.files.safe(target).mkdir(parents=True, exist_ok=True)
+        attempt = self.files.directory(private)
+        attempt.mkdir(parents=True, exist_ok=True)
+        with TemporaryDirectory(prefix="local-", dir=attempt) as temporary:
+            target = Path(temporary)
+            downloaded = self.download(job, target)
+            source = self.files.new_upload(job["id"], token, "source", downloaded.suffix)
+            shutil.move(downloaded, source)
+            source_info = self.files.register_upload(
+                job["id"], token, "source", source,
+                checkpoint=lambda: self.checkpoint(job, "decoding"),
+            )
+            profile = {"profile_id": "source-download", "version": "1",
+                       "description": "保存原始來源格式"}
+            if job["mode"] != "download_audio":
+                self.separate(job, source, source_info["metadata"], target)
+                profile = PROFILE
+            self.checkpoint(job, "verifying")
+        self.files.publish(job["id"], token, profile)
+
+    def download(self, job, target):
         command = [sys.executable, "-m", "music_stem_lab.download_task",
                    "--url", job["source_url"], "--target", str(target),
                    "--max-bytes", str(self.settings.max_upload_bytes),
                    "--max-seconds", str(self.settings.max_duration_seconds)]
-        process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        start = time.monotonic()
-        try:
-            while process.poll() is None:
-                self.checkpoint(job, "fetching")
-                self.files.capacity()
-                if time.monotonic() - start > self.settings.download_timeout_seconds:
-                    raise Problem("DOWNLOAD_TIMEOUT", "下載逾時。")
-                if sum(p.stat().st_size for p in target.iterdir() if p.is_file()) > self.settings.max_upload_bytes:
-                    raise Problem("SOURCE_LIMIT", "來源超出限制。")
-                self.stop.wait(0.25)
-            if process.returncode:
-                raise Problem("SOURCE_UNAVAILABLE", "來源無法取得。")
-            self.checkpoint(job, "decoding")
-            candidates = [p for p in target.iterdir() if p.name.startswith("source.") and p.suffix not in (".part", ".ytdl")]
-            if len(candidates) != 1:
-                raise Problem("SOURCE_UNAVAILABLE", "未取得單一來源。")
-            source = candidates[0]
-            path = self.files.new_upload(job["id"], token, "source", source.suffix)
-            shutil.move(str(source), str(path))
-            self.files.register_upload(job["id"], token, "source", path, checkpoint=lambda: self.checkpoint(job, "decoding"))
+
+        def check_size():
+            if sum(p.stat().st_size for p in target.iterdir() if p.is_file()) > self.settings.max_upload_bytes:
+                raise Problem("SOURCE_LIMIT", "來源超出限制。")
+
+        self.run_process(job, command, "fetching", self.settings.download_timeout_seconds,
+                         "SOURCE_UNAVAILABLE", "DOWNLOAD_TIMEOUT", check_size)
+        candidates = [p for p in target.iterdir() if p.name.startswith("source.")
+                      and p.suffix not in (".part", ".ytdl")]
+        if len(candidates) != 1:
+            raise Problem("SOURCE_UNAVAILABLE", "未取得單一來源。")
+        self.checkpoint(job, "decoding")
+        return candidates[0]
+
+    def separate(self, job, source, metadata, target):
+        duration = self.settings.max_duration_seconds
+        pcm = target / "input.wav"
+        self.files.capacity((duration + 1) * SAMPLE_RATE * 4 + 4096)
+        command = [*pcm_command(source, duration, 2, SAMPLE_RATE), str(pcm)]
+        self.run_process(job, command, "decoding", 120, "INVALID_AUDIO", "DECODE_TIMEOUT")
+        with wave.open(str(pcm), "rb") as wav:
+            frames = wav.getnframes()
+        if not 0 < frames <= duration * SAMPLE_RATE:
+            raise Problem("SOURCE_LIMIT", "來源實際時長超出限制。")
+        rate = metadata.get("sample_rate", SAMPLE_RATE)
+        frames = metadata.get("frames", frames)
+        channels = metadata.get("channels", 2)
+        kinds = required_artifacts(job)[1:]
+        output_bytes = frames * channels * 2 + 4096
+        if output_bytes > self.settings.max_upload_bytes:
+            raise Problem("SOURCE_LIMIT", "分軌後的 WAV 超出檔案大小限制。")
+        self.files.capacity(output_bytes * len(kinds))
+        command = [sys.executable, "-m", "music_stem_lab.model_task", str(self.settings.model_checkpoint),
+                   "--source", str(pcm), "--target", str(target), "--kinds", *kinds,
+                   "--rate", str(rate), "--frames", str(frames), "--channels", str(channels)]
+        self.run_process(job, command, "separating", 900, "MODEL_FAILED", "MODEL_TIMEOUT")
+        token = job["attempt_token"]
+        for kind in kinds:
             self.checkpoint(job, "verifying")
-            self.files.publish(job["id"], token, {"profile_id": "source-download", "version": "1",
-                                                 "description": "原始來源格式，未執行分軌"})
-        finally:
-            if process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=5)
+            path = self.files.new_upload(job["id"], token, kind, ".wav")
+            shutil.move(target / (kind + ".wav"), path)
+            self.files.register_upload(job["id"], token, kind, path)

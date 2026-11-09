@@ -70,6 +70,7 @@ def create_app(settings: Settings | None = None):
     settings = settings or Settings()
     store, worker = Store(settings), None
     files = Artifacts(store)
+    local_model_enabled = settings.local_workers and settings.model_checkpoint is not None
     worker = LocalWorker(store, files)
 
     @asynccontextmanager
@@ -137,12 +138,12 @@ def create_app(settings: Settings | None = None):
     @app.get("/api/capabilities")
     def capabilities():
         return {
-            "version": "0.1.0", "model_inference_available": False,
+            "version": "0.1.0", "model_inference_available": local_model_enabled,
             "remote_worker_configured": bool(settings.worker_token),
             "download_enabled": settings.enable_download,
             "modes": [
                 {"id": "download_audio", "label": "僅下載音訊", "execution": "local_download" if settings.enable_download else "waiting_worker"},
-                {"id": "separate", "label": "模型分軌", "execution": "waiting_model_worker"},
+                {"id": "separate", "label": "模型分軌", "execution": "local_model" if local_model_enabled else "waiting_model_worker"},
             ],
             "extra_exports": [{"id": key, "required_stem": value} for key, value in EXPORT_SOURCES.items()],
             "demo_available": settings.local_workers,

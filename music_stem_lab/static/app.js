@@ -26,14 +26,14 @@ function executionNote() {
   const demo = $("#demo").checked;
   const mode = document.querySelector('input[name="mode"]:checked').value;
   $("#extra-exports").disabled = mode !== "separate";
-  $("#execution-note").textContent = demo ? "示範會產生合成音，僅驗證排隊與檔案流程。" : mode !== "download_audio" ? "此工作會保留在佇列，等待另一台電腦的模型執行器。" : state.capabilities?.download_enabled ? "將取得原始音訊格式；請確認你具有適當使用權利。" : "來源下載尚未啟用；提交後會排隊等待執行器。";
+  $("#execution-note").textContent = demo ? "示範會產生合成音，僅驗證排隊與檔案流程。" : mode !== "download_audio" ? (state.capabilities?.model_inference_available ? "將使用這台電腦的 GPU 分軌。請確認你具有音源使用權利。" : "提交後會排隊等待模型執行器。") : state.capabilities?.download_enabled ? "將取得原始音訊格式；請確認你具有適當使用權利。" : "來源下載尚未啟用；提交後會排隊等待執行器。";
 }
 async function capabilities() {
   state.capabilities = await api("/api/capabilities");
   const storage = state.capabilities.storage;
   $("#storage-label").textContent = size(storage.used_bytes) + " / " + size(storage.quota_bytes);
   $("#storage-meter").value = Math.min(100, storage.used_bytes / storage.quota_bytes * 100);
-  $("#service-note").textContent = "工作室已就緒 · 模型將由另一台電腦處理。現在可管理佇列，或勾選示範流程測試完整操作。";
+  $("#service-note").textContent = state.capabilities.model_inference_available ? "工作室已就緒 · 本機 GPU 分軌已啟用。" : "工作室已就緒 · 可管理佇列或試用示範流程。";
   executionNote();
 }
 function description(job) {

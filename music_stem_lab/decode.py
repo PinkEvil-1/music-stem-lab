@@ -4,13 +4,16 @@ import time
 from imageio_ffmpeg import get_ffmpeg_exe, get_ffmpeg_version
 from .domain import Problem
 
+def pcm_command(path, max_seconds, channels, rate):
+    # Decode one extra second to distinguish an overlong source from a valid one.
+    return [get_ffmpeg_exe(), "-nostdin", "-hide_banner", "-loglevel", "error", "-xerror",
+            "-protocol_whitelist", "file,pipe", "-i", str(path),
+            "-map", "0:a:0", "-vn", "-sn", "-dn", "-t", str(max_seconds + 1),
+            "-ac", str(channels), "-ar", str(rate), "-c:a", "pcm_s16le"]
+
+
 def validate_decode(path, max_seconds, timeout_seconds=120, checkpoint=None):
-    # Decode at most max+1 seconds; that extra second distinguishes an overlong
-    # source from a valid source without trusting metadata or buffering it unbounded.
-    command = [get_ffmpeg_exe(), "-nostdin", "-hide_banner", "-loglevel", "error", "-xerror",
-               "-protocol_whitelist", "file,pipe", "-i", str(path),
-               "-map", "0:a:0", "-vn", "-sn", "-dn", "-t", str(max_seconds + 1),
-               "-ac", "1", "-ar", "16000", "-f", "s16le", "pipe:1"]
+    command = [*pcm_command(path, max_seconds, 1, 16000), "-f", "s16le", "pipe:1"]
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     start = time.monotonic()
     try:

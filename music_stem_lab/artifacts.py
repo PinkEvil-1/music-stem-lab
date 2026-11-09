@@ -4,6 +4,7 @@ import mimetypes
 import os
 from pathlib import Path
 import shutil
+import stat
 import threading
 import wave
 
@@ -32,8 +33,14 @@ class Artifacts:
         return path
 
     def usage(self):
-        used = sum(p.stat().st_size for p in self.root.rglob("*")
-                   if p.is_file() and not p.is_symlink())
+        used = 0
+        for path in self.root.rglob("*"):
+            try:
+                info = path.stat(follow_symlinks=False)
+            except FileNotFoundError:
+                continue  # SQLite sidecars and attempt files can disappear during this scan.
+            if stat.S_ISREG(info.st_mode):
+                used += info.st_size
         disk = shutil.disk_usage(self.root)
         return {"used_bytes": used, "quota_bytes": self.settings.quota_bytes,
                 "free_bytes": disk.free, "minimum_free_bytes": self.settings.min_free_bytes}

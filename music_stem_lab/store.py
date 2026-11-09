@@ -221,6 +221,9 @@ class Store:
                 "DOWNLOAD_TIMEOUT": "來源下載逾時。",
                 "STORAGE_LIMIT": "儲存空間不足。",
                 "INVALID_AUDIO": "輸出音訊驗證失敗。",
+                "MODEL_FAILED": "本機 CUDA 分軌失敗，請檢查模型和顯示卡狀態後重試。",
+                "MODEL_TIMEOUT": "本機 CUDA 分軌逾時。",
+                "DECODE_TIMEOUT": "來源解碼逾時。",
                 "MODEL_NOT_CONFIGURED": "模型執行器尚未配置。",
             }.get(code, "執行器回報處理失敗。")
             c.execute("""UPDATE jobs SET state=?,stage=NULL,token=NULL,lease_until=NULL,
