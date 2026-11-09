@@ -1,20 +1,20 @@
 # 外部查證來源
 
-查閱日期：2026-11-09。以下是一次資料查證快照；實作前應重查維護狀態、依賴版本及授權。
-僅查詢公開技術資訊；未傳送 repository、設定、日誌或音訊至外部。
+查閱：2026-11-09。以下為公開技術查詢；未傳送 repository、設定、日誌或音訊至外部。
 
-| ID | 來源 | 支持的結論 |
+| ID | 來源 | 用途 |
 | --- | --- | --- |
-| S001 | https://github.com/facebookresearch/demucs | 六軌候選含 guitar／piano；可做去人聲；獨立 rescale 影響相對音量；原 repository 已封存 |
-| S002 | https://github.com/ZFTurbo/Music-Source-Separation-Training | 支援多種分離架構及推論／訓練流程；權重能力須另外確認 |
-| S003 | https://github.com/yt-dlp/yt-dlp | 音訊取得與後處理依賴；完整 YouTube 支援涉及額外 JS 執行環境等依賴 |
-| S004 | https://arxiv.org/abs/2507.01172 | 古典雙吉他同音色分離研究；證明是可研究的特定問題，不證明一般歌曲可靠逐把分離 |
-| S005 | https://www.youtube.com/static?template=terms | 平台對下載與自動存取有許可限制；不能只檢查音樂權利 |
+| S001 | https://github.com/facebookresearch/demucs | 去人聲與六軌候選、音量策略及封存維護限制 |
+| S002 | https://github.com/ZFTurbo/Music-Source-Separation-Training | 替代分離架構及推論流程候選 |
+| S003 | https://github.com/yt-dlp/yt-dlp | 來源下載 adapter 與依賴查證 |
+| S004 | https://arxiv.org/abs/2507.01172 | 古典雙吉他同音色分離研究，不外推成通用保證 |
+| S005 | https://www.youtube.com/static?template=terms | 平台下載及自動存取的許可條件 |
+| S006 | https://pytorch.org/get-started/locally/ | 模型主機之後選擇相容安裝組合 |
+| S007 | https://fastapi.tiangolo.com/tutorial/testing/ | API 測試流程；實際相容性由本地測試驗證 |
+| S008 | https://github.com/imageio/imageio-ffmpeg | 隔離環境內取得 FFmpeg 執行檔，避免依賴全域 PATH |
 
-## 查證限制
+## 本地證據與限制
 
-- 沒有下載任何模型或權重，不代表任何候選權重已通過授權檢查。
-- 沒有在本機驗證依賴相容性或下載器可用性。
-- 沒有量測任何音質、效能、VRAM 或成功率。
-- 多吉他合併移除是基於類別輸出語意的工程推論；需 C004–C006 實測。
-- Python／SQLite 等架構是個人規模的工程提案，並非已從程式碼確認的現況。
+已建立並測試網站／控制面，使用 imageio-ffmpeg 0.8.1 所附 FFmpeg 進行真實編碼／解碼測試，見 evidence/LOCAL-001.md。
+未下載或執行模型；未通過任何音質門檻。使用者提供來源的真實 YouTube 下載已通過，見 evidence/SOURCE-001.md。
+模型與權重的許可仍須各自查核；程式套件可安裝不代表權重可交付。
