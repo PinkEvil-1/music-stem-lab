@@ -30,6 +30,7 @@ class LocalWorker:
         self.store, self.files = store, files
         self.settings = store.settings
         self.stop = threading.Event()
+        self.claim_lock = threading.Lock()
         self.worker_id = "local-" + uid()
         self.thread = None
         self.real_modes = ["download_audio"] if self.settings.enable_download else []
@@ -45,6 +46,15 @@ class LocalWorker:
         if self.thread:
             self.thread.join(timeout=10)
 
+    def stop_when_idle(self):
+        with self.claim_lock, self.store.connect() as connection:
+            active = connection.execute(
+                "SELECT 1 FROM jobs WHERE state IN ('running', 'publishing') LIMIT 1"
+            ).fetchone()
+            if active:
+                raise Problem("WORKER_BUSY", "有工作正在處理，請等它完成或在網頁取消後再關閉。")
+            self.stop.set()
+
     def checkpoint(self, job, stage, progress=None):
         if self.stop.is_set():
             raise Problem("LOCAL_SHUTDOWN", "本機執行器停止。")
@@ -57,9 +67,12 @@ class LocalWorker:
             job = None
             try:
                 self.files.capacity()
-                job = self.store.claim(self.worker_id, "demo", list(MODES), DEMO_STEMS)
-                if job is None and self.real_modes:
-                    job = self.store.claim(self.worker_id, "real", self.real_modes, STEMS)
+                with self.claim_lock:
+                    if self.stop.is_set():
+                        return
+                    job = self.store.claim(self.worker_id, "demo", list(MODES), DEMO_STEMS)
+                    if job is None and self.real_modes:
+                        job = self.store.claim(self.worker_id, "real", self.real_modes, STEMS)
                 if job:
                     self.execute(job)
                 else:

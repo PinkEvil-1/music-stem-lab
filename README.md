@@ -25,6 +25,8 @@
 
 Windows 已備妥環境時，雙擊根目錄的 `Start Music Stem Lab.cmd`。它會啟動 127.0.0.1:8000 的 GPU 工作室，確認就緒後開啟預設瀏覽器。若服務已啟動，會直接開啟頁面。
 
+要停止背景服務，雙擊同目錄的 `Stop Music Stem Lab.cmd`。有工作正在處理時，先等它完成或在網頁取消，再關閉。排隊中的工作會保留，下次啟動後接續。
+
 預設讀取 `.venv/Scripts/python.exe` 與 `models/5c90dfd2-34c22ccb.th`。若使用其他位置，可在專案根目錄建立 `.env.local.json`，設定 `python` 和 `checkpoint` 兩個路徑字串。相對路徑從專案根目錄解析。啟動日誌在 `.tmp/local-launch.log`。
 
 已完成的工作會顯示「開啟結果資料夾」，直接在 Windows 檔案總管開啟該筆產物所在資料夾。手動啟動時可加 `--enable-local-folder` 啟用。

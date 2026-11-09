@@ -1,4 +1,5 @@
 import argparse
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -16,6 +17,7 @@ def main():
     parser.add_argument("--enable-local-folder", action="store_true",
                         help="Allow the local UI to open completed job folders in Windows Explorer")
     args = parser.parse_args()
+    shutdown_token = os.environ.pop("MUSIC_STEM_LOCAL_SHUTDOWN_TOKEN", "")
     checkpoint = args.model_checkpoint.resolve() if args.model_checkpoint else None
     if checkpoint:
         try:
@@ -25,8 +27,13 @@ def main():
             parser.exit(2, "無法啟用本機 CUDA 模型，請檢查權重與 PyTorch 環境。\n")
     settings = Settings(enable_download=args.enable_download, model_checkpoint=checkpoint,
                         enable_local_folder=args.enable_local_folder)
-    uvicorn.run(create_app(settings),
-                host="127.0.0.1", port=args.port, access_log=False)
+
+    def shutdown():
+        server.should_exit = True
+
+    app = create_app(settings, shutdown=shutdown, shutdown_token=shutdown_token)
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=args.port, access_log=False))
+    server.run()
 
 if __name__ == "__main__":
     main()
