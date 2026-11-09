@@ -150,3 +150,9 @@ SQLite 以加欄位升至 schema 2，保留舊工作與 idempotency payload；�
 依使用者換機指示恢復 T011 的主機盤點。RTX 2070 SUPER（8 GiB）執行 CUDA 驅動測試通過，官方 Demucs 六軌權重下載並核對雜湊。
 完整 PyTorch wheel 下載卡住，CPU／CUDA 模型測試均為 NOT_RUN。候選、現況和下一步見 [ENV-002](evidence/ENV-002.md)。
 下一動作為完成隔離 CUDA 環境，對同一權重執行 30 秒合成音推論，核對六軌輸出並量測峰值顯存。T011 維持進行中，因正式素材及權重使用條件仍待確認。
+
+## W015：2026-11-09，續傳 CUDA 安裝包並跑通六軌模型
+
+PyTorch 2.8.0+cu128 以 HTTP Range 續傳完成，官方 SHA-256 一致。隔離環境完成安裝與相依檢查。
+Demucs htdemucs_6s 在 RTX 2070 SUPER 完成 30 秒及 180 秒合成音推論，並核對 30 秒的六個 PCM WAV。
+時間、顯存、權重與測試限制見 [ENV-002](evidence/ENV-002.md)。正式素材、音質及工作執行器串接仍待續。

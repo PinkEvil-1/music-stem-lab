@@ -43,7 +43,7 @@ DEFERRED 表示使用者已要求先跳過；不能記為已通過。CANCELLED �
 
 | ID | 相依 | 任務 | 狀態／下一動作 |
 | --- | --- | --- | --- |
-| T011 | 模型主機就緒後盤點 | 素材、候選權重、依賴及授權 | IN_PROGRESS；新主機盤點見 [ENV-002](evidence/ENV-002.md)，正式素材及權重授權確認待續 |
+| T011 | 模型主機就緒後盤點 | 素材、候選權重、依賴及授權 | IN_PROGRESS；新主機 CUDA 六軌合成音推論通過，見 [ENV-002](evidence/ENV-002.md)；正式素材及權重授權確認待續 |
 | T012 | T011 | 去人聲 baseline | DEFERRED；Q001／Q005 |
 | T013 | T011 | 去吉他與 bass 保留 | DEFERRED；Q002／Q005 |
 | T014 | T012、T013 | 比較模型與重混方法、固定品質門檻 | DEFERRED |
