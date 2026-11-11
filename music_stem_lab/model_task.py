@@ -2,8 +2,10 @@
 import argparse
 import hashlib
 import io
+import json
 import math
 from pathlib import Path
+from uuid import UUID
 
 from .domain import EXPORT_SOURCES
 from .presets import DEFAULT_PRESET, PRESETS
@@ -102,7 +104,13 @@ def main():
     parser.add_argument("--channels", type=int)
     args = parser.parse_args()
     model = load(args.checkpoint)
-    if not args.check:
+    if args.check:
+        import torch
+
+        properties = torch.cuda.get_device_properties(torch.cuda.current_device())
+        uuid = getattr(properties, "uuid", None)
+        print(json.dumps({"device_uuid": str(UUID(str(uuid))) if uuid else None}))
+    else:
         separate(model, args.source, args.target, args.kinds, args.rate, args.frames, args.channels,
                  PRESETS[args.preset])
 

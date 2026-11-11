@@ -94,3 +94,4 @@ class Settings:
     max_duration_seconds: int = 1200
     download_timeout_seconds: int = 900
     demo_stage_seconds: float = 0.5
+    model_device_uuid: str | None = None

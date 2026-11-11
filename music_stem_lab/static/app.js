@@ -1,6 +1,6 @@
 "use strict";
 const $ = (selector) => document.querySelector(selector);
-const state = { capabilities: null, offset: 0, limit: 20, busy: false, fingerprint: null, key: null, signature: null, dialogJob: null };
+const state = { capabilities: null, hardware: undefined, hardwareAt: 0, hardwarePending: false, offset: 0, limit: 20, busy: false, fingerprint: null, key: null, signature: null, dialogJob: null };
 const labels = { queued: "排隊中", running: "處理中", publishing: "儲存中", recovering: "待恢復", completed: "已完成", failed: "失敗", cancelled: "已取消", deleting: "刪除中" };
 const modes = { download_audio: "下載音訊", separate: "模型分軌", remove_vocals: "去人聲", remove_guitar: "去吉他" };
 const stages = { fetching: "取得來源", decoding: "解碼音訊", separating: "分離音源", mixing: "製作伴奏", verifying: "驗證檔案" };
@@ -24,16 +24,58 @@ function exportSummary(job) {
   const outputs = selected.length ? "額外輸出：" + selected.map(kind => kinds[kind] || kind).join("、") : "僅原生音軌，無額外伴奏";
   return preset ? preset.label + " · " + outputs : outputs;
 }
+function resourceRow(label, actual, suggestedGiB) {
+  const row = el("div", "resource-row");
+  row.append(el("strong", "", label), el("span", "", "建議可用 " + suggestedGiB + " GiB"));
+  if (!actual) {
+    row.append(el("span", "", "無法讀取"));
+    return row;
+  }
+  const sufficient = actual.available_mib >= suggestedGiB * 1024;
+  const available = (actual.available_mib / 1024).toFixed(2);
+  const total = (actual.total_mib / 1024).toFixed(2);
+  row.append(el("span", sufficient ? "resource-ok" : "resource-low",
+    "可用 " + available + " / 共 " + total + " GiB · " + (sufficient ? "達到建議" : "低於建議")));
+  return row;
+}
+function renderHardware(preset) {
+  const target = $("#model-hardware");
+  if (state.hardware === undefined) {
+    target.textContent = "正在讀取本機硬體…";
+    return;
+  }
+  const gpu = state.hardware?.gpu;
+  target.replaceChildren(
+    resourceRow(gpu ? gpu.name + " 顯示記憶體" : "CUDA 顯示記憶體", gpu, preset.vram_gib),
+    resourceRow("系統記憶體", state.hardware?.ram, preset.ram_gib),
+    el("p", "export-note", "建議值為可用記憶體的參考。需求會隨音訊長度與同時執行的程式而變動。")
+  );
+}
+async function refreshHardware() {
+  if ($("#model-options").hidden || state.hardwarePending || Date.now() - state.hardwareAt < 10000) return;
+  state.hardwarePending = true;
+  try {
+    state.hardware = await api("/api/hardware");
+  } catch {
+    state.hardware = null;
+  } finally {
+    state.hardwareAt = Date.now();
+    state.hardwarePending = false;
+    showModelPreset();
+  }
+}
 function showModelPreset() {
   const preset = state.capabilities?.model_presets?.find(p => p.id === $("#model-preset").value);
   if (!preset) return;
   $("#model-description").textContent = preset.description + " " + preset.segment_seconds + " 秒分段 · " + Math.round(preset.overlap * 100) + "% 重疊 · 時移次數 " + preset.shifts;
+  renderHardware(preset);
 }
 function executionNote() {
   const demo = $("#demo").checked;
   const mode = document.querySelector('input[name="mode"]:checked').value;
   $("#extra-exports").disabled = mode !== "separate";
   $("#model-options").hidden = demo || mode !== "separate" || !$("#model-preset").value;
+  void refreshHardware();
   $("#execution-note").textContent = demo ? "示範會產生合成音，僅驗證排隊與檔案流程。" : mode !== "download_audio" ? (state.capabilities?.model_inference_available ? "將使用這台電腦的 GPU 分軌。請確認你具有音源使用權利。" : "提交後會排隊等待模型執行器。") : state.capabilities?.download_enabled ? "將取得原始音訊格式；請確認你具有適當使用權利。" : "來源下載尚未啟用；提交後會排隊等待執行器。";
 }
 async function capabilities() {

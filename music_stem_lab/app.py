@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from .artifacts import Artifacts
 from .domain import MODES, EXPORT_SOURCES, Problem, Settings
+from .hardware import hardware_status
 from .local_worker import LocalWorker
 from .store import Store
 from .presets import DEFAULT_PRESET, MODEL_NAME, PRESETS, PresetId
@@ -162,6 +163,12 @@ def create_app(settings: Settings | None = None):
                        "max_file_bytes": settings.max_upload_bytes, "quota_bytes": settings.quota_bytes},
             "storage": files.usage(),
         }
+
+    @app.get("/api/hardware")
+    def hardware():
+        if not local_model_enabled:
+            raise Problem("MODEL_NOT_CONFIGURED", "目前未啟用本機分軌模型。", 404)
+        return hardware_status(settings.model_device_uuid)
 
     @app.post("/api/jobs/batch")
     def batch(body: Batch):

@@ -35,6 +35,16 @@ Windows 已備妥環境時，雙擊根目錄的 `Start Music Stem Lab.cmd`。它
 
 預設讀取 `.venv/Scripts/python.exe` 與 `models/5c90dfd2-34c22ccb.th`。若使用其他位置，可在專案根目錄建立 `.env.local.json`，設定 `python` 和 `checkpoint` 兩個路徑字串。相對路徑從專案根目錄解析。啟動日誌在 `.tmp/local-launch.log`。
 
+網站選擇「模型分軌」後，可選快速、均衡（預設）或精細。三組均使用 Demucs htdemucs_6s。網頁會顯示所用顯卡、當下可用與總 VRAM、系統 RAM，並以綠字或紅字比較預設建議。
+
+| 預設 | 分段／重疊／時移次數 | 建議可用 VRAM／RAM |
+| --- | --- | --- |
+| 快速 | 4 秒／25%／1 次 | 3／4 GiB |
+| 均衡 | 6 秒／25%／3 次 | 5／6 GiB |
+| 精細 | 7 秒／50%／5 次 | 7／8 GiB |
+
+建議值是操作參考，記憶體占用與處理時間會隨音訊和當下負載而變動。所選預設會跟隨工作保存，實際執行設定可在產物的處理紀錄查閱。
+
 若已備妥 `models/wheels/environment.lock` 和其中列出的 wheel，可用相同版本與架構的 Python 離線重建環境。此電腦的備份對應 Windows x64、Python 3.13 與 CUDA 版 PyTorch。
 
 ~~~powershell

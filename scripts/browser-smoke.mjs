@@ -20,7 +20,10 @@ const port = await new Promise((resolve) => {
   socket.listen(0, "127.0.0.1", () => { const value = socket.address().port; socket.close(() => resolve(value)); });
 });
 const base = "http://127.0.0.1:" + port;
-const server = spawn(python, ["-m", "music_stem_lab", "--port", String(port)], {
+const checkpoint = process.env.MUSIC_STEM_TEST_CHECKPOINT;
+const serverArgs = ["-m", "music_stem_lab", "--port", String(port)];
+if (checkpoint) serverArgs.push("--model-checkpoint", checkpoint);
+const server = spawn(python, serverArgs, {
   cwd: root, windowsHide: true, stdio: "ignore",
   env: { ...process.env, MUSIC_STEM_DATA_DIR: path.join(work, "data"), MUSIC_STEM_WORKER_TOKEN: "" },
 });
@@ -77,7 +80,32 @@ try {
   await cdp.call("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
   await until(() => cdp.evaluate("document.querySelector('#service-note').textContent.includes('工作室已就緒')"));
   assert.equal(await cdp.evaluate("document.querySelector('#extra-exports').disabled"), true);
+  if (checkpoint) {
+    await cdp.evaluate("document.querySelector('input[value=separate]').click(); true");
+    await until(() => cdp.evaluate("Boolean(state.hardware?.gpu && state.hardware?.ram)"));
+    assert.equal(await cdp.evaluate("document.querySelector('#model-options').hidden"), false);
+    assert.equal(await cdp.evaluate("document.querySelector('#model-preset').value"), "balanced");
+    const result = await cdp.evaluate(`(() => {
+      const select = document.querySelector('#model-preset');
+      const rows = Array.from(select.options, option => {
+        select.value = option.value;
+        select.dispatchEvent(new Event('change'));
+        return Array.from(document.querySelectorAll('.resource-row'), row => row.lastChild.className);
+      });
+      return { rows, actual: state.hardware };
+    })()`);
+    const expectedClass = (mib, threshold) => mib >= threshold * 1024 ? "resource-ok" : "resource-low";
+    assert.deepEqual(result.rows, [[3, 4], [5, 6], [7, 8]].map(([vram, ram]) => [
+      expectedClass(result.actual.gpu.available_mib, vram),
+      expectedClass(result.actual.ram.available_mib, ram),
+    ]));
+    assert.match(result.actual.gpu.name, /NVIDIA/i);
+    assert.equal(await cdp.evaluate("document.querySelector('#model-description').textContent.includes('50%')"), true);
+    await cdp.call("Page.captureScreenshot", { format: "png", captureBeyondViewport: true })
+      .then(r => writeFileSync(path.join(work, "model-hardware.png"), Buffer.from(r.data, "base64")));
+  }
   await cdp.evaluate("document.querySelector('#example').click(); true");
+  assert.equal(await cdp.evaluate("document.querySelector('#model-options').hidden"), true);
   assert.equal(await cdp.evaluate("document.querySelector('#export-no-vocals').checked || document.querySelector('#export-no-guitar').checked"), false);
   await cdp.evaluate("document.querySelector('#export-no-vocals').click(); true");
   assert.equal(await cdp.evaluate("document.querySelector('#export-no-guitar').checked"), false);
@@ -108,6 +136,10 @@ try {
   await cdp.call("Page.captureScreenshot", { format: "png", captureBeyondViewport: true }).then(r => writeFileSync(path.join(work, "mobile.png"), Buffer.from(r.data, "base64")));
   assert.deepEqual(cdp.errors, []);
   const result = { result: "PASS", checks: ["server_http", "browser_submit_two_jobs", "demo_fifo_completion", "artifact_dialog", "audio_range", "independent_export_checkboxes", "export_options_persisted", "wav_playback", "mobile_no_overflow", "no_browser_errors"], screenshots: [path.join(work, "desktop.png"), path.join(work, "mobile.png")] };
+  if (checkpoint) {
+    result.checks.push("real_gpu_and_ram", "preset_resource_colors");
+    result.screenshots.push(path.join(work, "model-hardware.png"));
+  }
   writeFileSync(path.join(work, "result.json"), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result));
 } finally {

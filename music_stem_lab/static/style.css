@@ -12,3 +12,18 @@
 #extra-exports:disabled .export-option{cursor:not-allowed}
 .export-note{font-size:13px;color:var(--muted);line-height:1.8;margin:8px 0 0}
 .job-export-summary{font-size:13px;color:#c4d1ae;margin:5px 0 0}
+
+/* Model recommendations and measured free memory. */
+.model-hardware { display: grid; gap: .55rem; margin-top: .65rem; }
+.resource-row { display: grid; gap: .12rem; font-size: .86rem; }
+.resource-row .resource-ok { color: #9aebbc; }
+.resource-row .resource-low { color: #ffaaa7; }
+#model-preset {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--text);
+  font-size: 15px;
+}
