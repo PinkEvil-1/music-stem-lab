@@ -14,7 +14,8 @@ import wave
 from .artifacts import Artifacts
 from .decode import pcm_command
 from .domain import MODES, STAGES, DEMO_STEMS, Problem, required_artifacts
-from .model_task import PROFILE, SAMPLE_RATE, STEMS
+from .model_task import SAMPLE_RATE, STEMS, model_profile
+from .presets import DEFAULT_PRESET, PRESETS
 from .store import Store, uid
 
 def demo_audio(frequency=440):
@@ -59,7 +60,8 @@ class LocalWorker:
                 self.files.capacity()
                 job = self.store.claim(self.worker_id, "demo", list(MODES), DEMO_STEMS)
                 if job is None and self.real_modes:
-                    job = self.store.claim(self.worker_id, "real", self.real_modes, STEMS)
+                    job = self.store.claim(self.worker_id, "real", self.real_modes, STEMS,
+                                           supports_local_preset=self.settings.model_checkpoint is not None)
                 if job:
                     self.execute(job)
                 else:
@@ -152,7 +154,7 @@ class LocalWorker:
                        "description": "保存原始來源格式"}
             if job["mode"] != "download_audio":
                 self.separate(job, source, source_info["metadata"], target, title)
-                profile = PROFILE
+                profile = model_profile(job.get("model_preset") or DEFAULT_PRESET)
             self.checkpoint(job, "verifying")
         self.files.publish(job["id"], token, profile)
 
@@ -193,10 +195,13 @@ class LocalWorker:
         if output_bytes > self.settings.max_upload_bytes:
             raise Problem("SOURCE_LIMIT", "分軌後的 WAV 超出檔案大小限制。")
         self.files.capacity(output_bytes * len(kinds))
+        preset_id = job.get("model_preset") or DEFAULT_PRESET
         command = [sys.executable, "-m", "music_stem_lab.model_task", str(self.settings.model_checkpoint),
+                   "--preset", preset_id,
                    "--source", str(pcm), "--target", str(target), "--kinds", *kinds,
                    "--rate", str(rate), "--frames", str(frames), "--channels", str(channels)]
-        self.run_process(job, command, "separating", 900, "MODEL_FAILED", "MODEL_TIMEOUT")
+        self.run_process(job, command, "separating", PRESETS[preset_id].timeout_seconds,
+                         "MODEL_FAILED", "MODEL_TIMEOUT")
         token = job["attempt_token"]
         for kind in kinds:
             self.checkpoint(job, "verifying")

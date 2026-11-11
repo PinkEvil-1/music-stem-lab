@@ -7,6 +7,8 @@ import uuid
 
 from .domain import ACTIVE, MODES, STAGES, EXPORT_SOURCES, Problem, Settings, video_id, normalize_exports, normalize_stems
 
+from .presets import PRESETS
+
 def uid():
     return uuid.uuid4().hex
 
@@ -72,7 +74,9 @@ class Store:
                 for column in columns:
                     if column not in existing:
                         c.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " TEXT NOT NULL DEFAULT '[]'")
-            c.execute("PRAGMA user_version=2")
+            if "model_preset" not in {row["name"] for row in c.execute("PRAGMA table_info(jobs)")}:
+                c.execute("ALTER TABLE jobs ADD COLUMN model_preset TEXT")
+            c.execute("PRAGMA user_version=3")
 
     def connect(self):
         c = sqlite3.connect(self.path, timeout=15, factory=ClosingConnection)
@@ -110,16 +114,20 @@ class Store:
         c.execute("UPDATE counters SET value=value+1 WHERE name='queue'")
         return c.execute("SELECT value FROM counters WHERE name='queue'").fetchone()[0]
 
-    def submit(self, urls, mode, execution_kind, key, extra_exports=None):
+    def submit(self, urls, mode, execution_kind, key, extra_exports=None, model_preset=None):
         if mode not in MODES or execution_kind not in ("real", "demo"):
             raise Problem("INVALID_MODE", "此處理模式尚未支援。", 422)
         if not 1 <= len(urls) <= self.settings.max_batch:
             raise Problem("BATCH_LIMIT", "每批需有 1 至 20 筆網址。", 422)
         exports = normalize_exports(mode, extra_exports)
+        if model_preset is not None and (model_preset not in PRESETS or mode != "separate" or execution_kind != "real"):
+            raise Problem("INVALID_PRESET", "分軌預設僅適用本機模型分軌工作。", 422)
         # Preserve legacy idempotency payloads for existing jobs.
         payload_fields = [urls, mode, execution_kind]
         if mode == "separate":
             payload_fields.append(exports)
+        if model_preset is not None:
+            payload_fields.append(model_preset)
         payload = json.dumps(payload_fields, ensure_ascii=False)
         with self.transaction() as c:
             existing = c.execute("SELECT * FROM batches WHERE key=?", (key,)).fetchone()
@@ -127,6 +135,8 @@ class Store:
                 if existing["payload"] != payload:
                     raise Problem("IDEMPOTENCY_CONFLICT", "此請求識別碼已用於不同內容。")
                 return json.loads(existing["result"])
+            if model_preset is not None and (not self.settings.local_workers or self.settings.model_checkpoint is None):
+                raise Problem("MODEL_NOT_CONFIGURED", "目前未啟用本機分軌模型。", 422)
             batch, items = uid(), []
             for index, url in enumerate(urls):
                 try:
@@ -139,7 +149,8 @@ class Store:
                     (id,batch_id,video_id,mode,execution_kind,state,sequence,created_at,updated_at)
                     VALUES (?,?,?,?,?,'queued',?,?,?)""",
                     (job_id, batch, vid, mode, execution_kind, self.next_sequence(c), now, now))
-                c.execute("UPDATE jobs SET extra_exports=? WHERE id=?", (json.dumps(exports), job_id))
+                c.execute("UPDATE jobs SET extra_exports=?, model_preset=? WHERE id=?",
+                          (json.dumps(exports), model_preset, job_id))
                 self.event(c, job_id, "queued", "已加入佇列")
                 items.append({"index": index, "job_id": job_id})
             result = {"batch_id": batch, "items": items}
@@ -157,7 +168,7 @@ class Store:
                     WHERE id=?""", (timestamp(), row["id"]))
                 self.event(c, row["id"], "recovering", "心跳逾時，保留執行權以免重複處理")
 
-    def claim(self, worker_id, execution_kind, modes, native_stems=None):
+    def claim(self, worker_id, execution_kind, modes, native_stems=None, *, supports_local_preset=False):
         stems = normalize_stems(native_stems)
         self.sweep_expired()
         with self.transaction() as c:
@@ -168,6 +179,8 @@ class Store:
             if not row or row["execution_kind"] != execution_kind or row["mode"] not in modes:
                 return None
             job = dict(row)
+            if job["model_preset"] is not None and not supports_local_preset:
+                return None
             if job["mode"] == "separate":
                 exports = json.loads(job["extra_exports"])
                 if not stems or any(EXPORT_SOURCES[value] not in stems for value in exports):
@@ -281,6 +294,7 @@ class Store:
         result = {key: job[key] for key in fields}
         result["cancel_requested"] = bool(result["cancel_requested"])
         result["extra_exports"] = json.loads(job.get("extra_exports", "[]"))
+        result["model_preset"] = job.get("model_preset")
         result["native_stems"] = json.loads(job.get("native_stems", "[]"))
         result["source_url"] = "https://www.youtube.com/watch?v=" + job["video_id"]
         return result

@@ -128,6 +128,7 @@ def test_additive_schema_upgrade_preserves_legacy_jobs(tmp_path):
     with store.connect() as c:
         c.execute("ALTER TABLE jobs DROP COLUMN extra_exports")
         c.execute("ALTER TABLE jobs DROP COLUMN native_stems")
+        c.execute("ALTER TABLE jobs DROP COLUMN model_preset")
         c.execute("ALTER TABLE attempts DROP COLUMN native_stems")
         c.execute("PRAGMA user_version=1")
     upgraded = Store(settings)
@@ -136,4 +137,4 @@ def test_additive_schema_upgrade_preserves_legacy_jobs(tmp_path):
     assert detail["native_stems"] == []
     assert upgraded.submit([URL], "download_audio", "real", "example-existing-key") == result
     with upgraded.connect() as c:
-        assert c.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert c.execute("PRAGMA user_version").fetchone()[0] == 3

@@ -6,20 +6,23 @@ import math
 from pathlib import Path
 
 from .domain import EXPORT_SOURCES
+from .presets import DEFAULT_PRESET, PRESETS
 
 STEMS = ("drums", "bass", "other", "vocals", "guitar", "piano")
 SAMPLE_RATE = 44100
-SEGMENT_SECONDS = 6
-OVERLAP = 0.25
-SHIFTS = 3
 WEIGHTS_SHA256 = "34c22ccb381c6f9fdbf324f04e1e2fe21aaaf293f5ded163a162697ff9a02ddd"
-PROFILE = {
-    "profile_id": "demucs-htdemucs-6s-cuda",
-    "version": "demucs-4.0.1",
-    "description": (f"Demucs 六軌 CUDA，{SEGMENT_SECONDS} 秒分段、{OVERLAP:.0%} 重疊、"
-                    f"shifts={SHIFTS}；伴奏由其餘音軌相加。"),
-    "weights_sha256": WEIGHTS_SHA256,
-}
+def model_profile(preset_id):
+    preset = PRESETS[preset_id]
+    profile_id = "demucs-htdemucs-6s-cuda"
+    if preset_id != DEFAULT_PRESET:
+        profile_id += "-" + preset_id
+    return {
+        "profile_id": profile_id,
+        "version": "demucs-4.0.1",
+        "description": (f"Demucs 六軌 CUDA，{preset.segment_seconds} 秒分段、{preset.overlap:.0%} 重疊、"
+                        f"shifts={preset.shifts}；伴奏由其餘音軌相加。"),
+        "weights_sha256": WEIGHTS_SHA256,
+    }
 
 
 def load(checkpoint):
@@ -40,7 +43,7 @@ def load(checkpoint):
     return model
 
 
-def separate(model, source, target, kinds, rate, frames, channels):
+def separate(model, source, target, kinds, rate, frames, channels, preset):
     import soundfile
     import torch
     from demucs.apply import apply_model
@@ -51,7 +54,7 @@ def separate(model, source, target, kinds, rate, frames, channels):
     if actual_rate != SAMPLE_RATE or mix.shape[1] != 2:
         raise ValueError("模型輸入需為 44.1 kHz 雙聲道。")
     stems = apply_model(model, torch.from_numpy(mix.T)[None], device="cuda",
-                        segment=SEGMENT_SECONDS, overlap=OVERLAP, shifts=SHIFTS)[0]
+                        segment=preset.segment_seconds, overlap=preset.overlap, shifts=preset.shifts)[0]
     # A WAV source keeps its original format. Align every derived WAV with it.
     def format_track(track):
         if channels == 1:
@@ -90,6 +93,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("checkpoint", type=Path)
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--preset", choices=PRESETS, default=DEFAULT_PRESET)
     parser.add_argument("--source", type=Path)
     parser.add_argument("--target", type=Path)
     parser.add_argument("--kinds", nargs="+", choices=(*STEMS, *EXPORT_SOURCES))
@@ -99,7 +103,8 @@ def main():
     args = parser.parse_args()
     model = load(args.checkpoint)
     if not args.check:
-        separate(model, args.source, args.target, args.kinds, args.rate, args.frames, args.channels)
+        separate(model, args.source, args.target, args.kinds, args.rate, args.frames, args.channels,
+                 PRESETS[args.preset])
 
 
 if __name__ == "__main__":

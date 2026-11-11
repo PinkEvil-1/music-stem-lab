@@ -20,16 +20,32 @@ function selectedExports() { return [...document.querySelectorAll('input[name="e
 function exportSummary(job) {
   if (job.mode !== "separate") return "";
   const selected = job.extra_exports || [];
-  return selected.length ? "額外輸出：" + selected.map(kind => kinds[kind] || kind).join("、") : "僅原生音軌，無額外伴奏";
+  const preset = state.capabilities?.model_presets?.find(p => p.id === job.model_preset);
+  const outputs = selected.length ? "額外輸出：" + selected.map(kind => kinds[kind] || kind).join("、") : "僅原生音軌，無額外伴奏";
+  return preset ? preset.label + " · " + outputs : outputs;
+}
+function showModelPreset() {
+  const preset = state.capabilities?.model_presets?.find(p => p.id === $("#model-preset").value);
+  if (!preset) return;
+  $("#model-description").textContent = preset.description + " " + preset.segment_seconds + " 秒分段 · " + Math.round(preset.overlap * 100) + "% 重疊 · 時移次數 " + preset.shifts;
 }
 function executionNote() {
   const demo = $("#demo").checked;
   const mode = document.querySelector('input[name="mode"]:checked').value;
   $("#extra-exports").disabled = mode !== "separate";
+  $("#model-options").hidden = demo || mode !== "separate" || !$("#model-preset").value;
   $("#execution-note").textContent = demo ? "示範會產生合成音，僅驗證排隊與檔案流程。" : mode !== "download_audio" ? (state.capabilities?.model_inference_available ? "將使用這台電腦的 GPU 分軌。請確認你具有音源使用權利。" : "提交後會排隊等待模型執行器。") : state.capabilities?.download_enabled ? "將取得原始音訊格式；請確認你具有適當使用權利。" : "來源下載尚未啟用；提交後會排隊等待執行器。";
 }
 async function capabilities() {
   state.capabilities = await api("/api/capabilities");
+  const select = $("#model-preset");
+  const presets = state.capabilities.model_presets || [];
+  if (select.options.length !== presets.length) {
+    const previous = select.value;
+    select.replaceChildren(...presets.map(preset => new Option(preset.label + " · " + preset.model, preset.id)));
+    select.value = presets.some(p => p.id === previous) ? previous : state.capabilities.default_model_preset;
+    showModelPreset();
+  }
   const storage = state.capabilities.storage;
   $("#storage-label").textContent = size(storage.used_bytes) + " / " + size(storage.quota_bytes);
   $("#storage-meter").value = Math.min(100, storage.used_bytes / storage.quota_bytes * 100);
@@ -135,6 +151,7 @@ $("#job-form").addEventListener("submit", async (event) => {
   if (!urls.length || urls.length > 20) { toast("請輸入 1 至 20 筆網址。"); return; }
   const mode = document.querySelector('input[name="mode"]:checked').value;
   const payload = { urls, mode, extra_exports: mode === "separate" ? selectedExports() : [], execution_kind: $("#demo").checked ? "demo" : "real" };
+  if (!$("#model-options").hidden) payload.model_preset = $("#model-preset").value;
   const fingerprint = JSON.stringify(payload);
   if (state.fingerprint !== fingerprint || !state.key) { state.fingerprint = fingerprint; state.key = crypto.randomUUID(); }
   $("#submit").disabled = true;
@@ -150,6 +167,7 @@ $("#urls").addEventListener("input", updateCount);
 $("#example").addEventListener("click", () => { $("#urls").value = "https://youtu.be/EXAMPLE0001\nhttps://www.youtube.com/watch?v=EXAMPLE0002"; $("#demo").checked = true; document.querySelector('input[value="separate"]').checked = true; updateCount(); executionNote(); });
 for (const radio of document.querySelectorAll('input[name="mode"]')) radio.addEventListener("change", executionNote);
 $("#demo").addEventListener("change", executionNote);
+$("#model-preset").addEventListener("change", showModelPreset);
 $("#filter").addEventListener("change", () => { state.offset = 0; refresh(true); });
 $("#refresh").addEventListener("click", () => refresh(true));
 $("#previous").addEventListener("click", () => { state.offset = Math.max(0, state.offset - state.limit); refresh(true); });

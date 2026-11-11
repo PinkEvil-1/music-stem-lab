@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-Hant">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101715"><title>Music Stem Lab · 音樂工作室</title><link rel="icon" type="image/svg+xml" href="/static/favicon.svg"><link rel="stylesheet" href="/static/style.css?v=2"><script src="/static/app.js?v=2" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101715"><title>Music Stem Lab · 音樂工作室</title><link rel="icon" type="image/svg+xml" href="/static/favicon.svg"><link rel="stylesheet" href="/static/style.css?v=2"><script src="/static/app.js?v=3" defer></script></head>
 <body>
 <header class="topbar"><a class="brand" href="/"><span class="brand-icon" aria-hidden="true">≋</span> MUSIC STEM LAB</a><div class="local-badge"><span class="dot"></span>私人工作室 <span class="version">v0.1</span></div></header>
 <main>
@@ -15,6 +15,11 @@
 <fieldset><legend>處理方式</legend>
 <label class="mode-option"><input type="radio" name="mode" value="download_audio" checked><span><strong>僅下載音訊</strong><small>保留來源格式，不執行分軌</small></span><span class="mode-symbol" aria-hidden="true">↓</span></label>
 <label class="mode-option"><input type="radio" name="mode" value="separate"><span><strong>模型分軌</strong><small>保留模型提供的所有原生音軌</small></span><span class="mode-symbol" aria-hidden="true">≋</span></label>
+</fieldset>
+<fieldset id="model-options" hidden><legend>分軌預設</legend>
+<label class="sr-only" for="model-preset">選擇分軌預設</label>
+<select id="model-preset" aria-describedby="model-description"></select>
+<p id="model-description" class="export-note"></p>
 </fieldset>
 <fieldset id="extra-exports" disabled><legend>額外輸出 <span class="hint">選填，可同時勾選</span></legend>
 <label class="export-option"><input id="export-no-vocals" type="checkbox" name="extra_exports" value="no_vocals"><span><strong>去人聲版本</strong><small>額外產生可直接播放的無人聲伴奏</small></span></label>

@@ -1,5 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 import hmac
 import os
 from pathlib import Path
@@ -16,6 +17,7 @@ from .artifacts import Artifacts
 from .domain import MODES, EXPORT_SOURCES, Problem, Settings
 from .local_worker import LocalWorker
 from .store import Store
+from .presets import DEFAULT_PRESET, MODEL_NAME, PRESETS, PresetId
 from .maintenance import ServiceLock
 
 class Batch(BaseModel):
@@ -23,6 +25,7 @@ class Batch(BaseModel):
     mode: Literal["download_audio", "separate", "remove_vocals", "remove_guitar"]
     execution_kind: Literal["real", "demo"] = "real"
     extra_exports: list[Literal["no_vocals", "no_guitar"]] = Field(default_factory=list, max_length=2)
+    model_preset: PresetId | None = None
     idempotency_key: str = Field(min_length=8, max_length=128)
 
 class Claim(BaseModel):
@@ -141,6 +144,11 @@ def create_app(settings: Settings | None = None):
     def capabilities():
         return {
             "version": "0.1.0", "model_inference_available": local_model_enabled,
+            "model_presets": [
+                {"id": key, "model": MODEL_NAME, **asdict(preset)}
+                for key, preset in PRESETS.items()
+            ] if local_model_enabled else [],
+            "default_model_preset": DEFAULT_PRESET if local_model_enabled else None,
             "remote_worker_configured": bool(settings.worker_token),
             "download_enabled": settings.enable_download,
             "local_folder_enabled": open_folder is not None,
@@ -160,7 +168,8 @@ def create_app(settings: Settings | None = None):
         if body.execution_kind == "demo" and not settings.local_workers:
             raise Problem("DEMO_DISABLED", "此服務未啟用示範執行器。", 422)
         files.capacity()
-        result = store.submit(body.urls, body.mode, body.execution_kind, body.idempotency_key, body.extra_exports)
+        result = store.submit(body.urls, body.mode, body.execution_kind, body.idempotency_key,
+                              body.extra_exports, body.model_preset)
         return JSONResponse(result, status_code=202 if any("job_id" in i for i in result["items"]) else 422)
 
     @app.get("/api/jobs")
