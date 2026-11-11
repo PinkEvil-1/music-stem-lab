@@ -9,6 +9,7 @@ import time
 from urllib.error import URLError
 from urllib.request import ProxyHandler, build_opener
 
+from scripts.setup_local import prepare
 from music_stem_lab.windows_job import service_job
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,14 +31,7 @@ def ready():
     return True
 
 
-def start(job_name):
-    config_path = ROOT / ".env.local.json"
-    config = json.loads(config_path.read_text(encoding="utf-8-sig")) if config_path.exists() else {}
-    python = ROOT / config.get("python", ".venv/Scripts/python.exe")
-    checkpoint = ROOT / config.get("checkpoint", "models/5c90dfd2-34c22ccb.th")
-    if not python.is_file() or not checkpoint.is_file():
-        raise RuntimeError("Missing CUDA Python environment or checkpoint. See README.md and .env.local.json.")
-
+def start(job_name, python, checkpoint):
     log_path = ROOT / ".tmp" / "local-launch.log"
     log_path.parent.mkdir(exist_ok=True)
     environment = {**os.environ, "MUSIC_STEM_WORKER_TOKEN": "",
@@ -68,11 +62,14 @@ def main():
                 os.startfile(URL)
             print(f"Music Stem Lab is already running at {URL}")
             return 0
-        print("Starting Music Stem Lab...", flush=True)
+        paths = prepare(ROOT)
+        if paths is None:
+            return 0
+        print("正在啟動 Music Stem Lab…", flush=True)
         with service_job() as job_name:
-            process = start(job_name)
+            process = start(job_name, *paths)
             print(URL, flush=True)
-            print("Keep this window open. Close it to stop Music Stem Lab.", flush=True)
+            print("請保留此視窗。關閉視窗即可停止 Music Stem Lab。", flush=True)
             if not args.no_browser:
                 os.startfile(URL)
             try:

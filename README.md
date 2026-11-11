@@ -29,6 +29,10 @@ Windows 已備妥環境時，雙擊根目錄的 `Start Music Stem Lab.cmd`。它
 
 在工作管理員的「詳細資料」可找 `cmd.exe` 和 `python.exe`。啟用「命令列」欄後，以 `-m music_stem_lab` 辨識服務，以 `-m scripts.start_local` 辨識啟動器。
 
+雙擊 Start 會先檢查 Python、網站套件、CUDA 套件與六軌權重。出現中文提示時，輸入 `Y` 並按 Enter 開始建置，輸入 `N` 取消。缺少 Python 時可先用 WinGet 安裝 Python 3.13。需要支援 CUDA 的 NVIDIA 顯示卡與可用驅動程式。已有完整環境會直接驗證並啟動。
+
+整體百分比按建置階段更新。pip 顯示各套件的下載進度，模型權重以已收到的位元組更新百分比，通過 SHA-256 才會保存。已有離線 wheel 備份時會優先使用。下載中斷可重開 Start 重試。
+
 預設讀取 `.venv/Scripts/python.exe` 與 `models/5c90dfd2-34c22ccb.th`。若使用其他位置，可在專案根目錄建立 `.env.local.json`，設定 `python` 和 `checkpoint` 兩個路徑字串。相對路徑從專案根目錄解析。啟動日誌在 `.tmp/local-launch.log`。
 
 若已備妥 `models/wheels/environment.lock` 和其中列出的 wheel，可用相同版本與架構的 Python 離線重建環境。此電腦的備份對應 Windows x64、Python 3.13 與 CUDA 版 PyTorch。

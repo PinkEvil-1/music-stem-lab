@@ -44,6 +44,8 @@ Windows 雙擊專案根目錄的 `Start Music Stem Lab.cmd` 啟動（T033），�
 依 README 帶入 --model-checkpoint 後，本機會領取 real 分軌工作。未配置模型時，這類工作會等待執行器。
 體驗完整流程請先取消前方尚無執行器的 real 工作，再勾選示範。
 
+- T039 已加入首次啟動檢查與建置，操作見 README。下一個任務為 T040 模型預設。
+
 ## 尚未完成／未經驗證
 
 - 新主機上的模型環境與驗證狀態見 ENV-002；舊機的網站 .venv 需按 README 在新 checkout 重建。
